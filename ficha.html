@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ficha do Agente - Protocolo Miragem</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="ficha-body">
+    <header class="app-bar">
+        <button class="btn btn-secondary" onclick="window.location.href='index.html'">Voltar aos Arquivos</button>
+        <div>
+            <p class="eyebrow">Ficha oficial digital</p>
+            <h1>Protocolo Miragem</h1>
+        </div>
+    </header>
+
+    <main class="sheet-wrap">
+        <form id="form-ficha" onsubmit="return false;">
+            <section class="sheet-page page-one">
+                <div class="identity-grid">
+                    <label class="field field-name">
+                        <span>NOME:</span>
+                        <input type="text" id="identidade-nome">
+                    </label>
+                    <label class="field field-player">
+                        <span>PLAYER:</span>
+                        <input type="text" id="identidade-player">
+                    </label>
+                    <label class="field">
+                        <span>CODINOME:</span>
+                        <input type="text" id="identidade-codinome">
+                    </label>
+                    <label class="field">
+                        <span>EQUIPE:</span>
+                        <input type="text" id="identidade-equipe">
+                    </label>
+                    <label class="field">
+                        <span>OCUPACAO:</span>
+                        <input type="text" id="identidade-ocupacao">
+                    </label>
+                </div>
+
+                <section class="attribute-panel" aria-label="Atributos">
+                    <div class="attribute-web">
+                        <div class="ring ring-one"></div>
+                        <div class="ring ring-two"></div>
+                        <div class="ring ring-three"></div>
+                        <div class="sigil-line line-a"></div>
+                        <div class="sigil-line line-b"></div>
+                        <div class="sigil-line line-c"></div>
+                        <div class="sigil-line line-d"></div>
+                        <label class="attribute-node attr-carisma"><span>CARISMA</span><input type="number" id="atributos-carisma"></label>
+                        <label class="attribute-node attr-sabedoria"><span>SABEDORIA</span><input type="number" id="atributos-sabedoria"></label>
+                        <label class="attribute-node attr-agilidade"><span>AGILIDADE</span><input type="number" id="atributos-agilidade"></label>
+                        <label class="attribute-node attr-corpo"><span>CORPO</span><input type="number" id="atributos-corpo"></label>
+                        <label class="attribute-node attr-vigor"><span>VIGOR</span><input type="number" id="atributos-vigor"></label>
+                        <label class="attribute-node attr-inteligencia"><span>INTELIGENCIA</span><input type="number" id="atributos-inteligencia"></label>
+                        <label class="attribute-node attr-forca"><span>FORCA</span><input type="number" id="atributos-forca"></label>
+                        <label class="attribute-core"><span>HUMANIDADE</span><input type="number" id="atributos-humanidade"></label>
+                    </div>
+                </section>
+
+                <div class="status-level-grid">
+                    <div class="status-box">
+                        <label><span>PV <small>(Pontos de Vida)</small></span><input type="number" id="status-pv"></label>
+                        <label><span>PD <small>(Pontos de Determinacao)</small></span><input type="number" id="status-pd"></label>
+                    </div>
+
+                    <label class="gc-box">
+                        <span>GC <small>(Grau de Corrupcao)</small></span>
+                        <input type="number" id="status-gc">
+                    </label>
+
+                    <fieldset class="level-table">
+                        <legend>TABELA DE NIVEIS</legend>
+                        <div class="level-fields">
+                            <label><span>NIVEL ATUAL:</span><input type="number" id="identidade-nivel"></label>
+                            <label><span>XP TOTAL:</span><input type="number" id="identidade-xp"></label>
+                        </div>
+                        <label class="notes-field">
+                            <span>Habilidade / Melhoria de Pericia / Aumento de Atributo:</span>
+                            <textarea id="identidade-melhorias" rows="5" placeholder="Registe aqui as melhorias ganhas por nivel..."></textarea>
+                        </label>
+                    </fieldset>
+                </div>
+
+                <footer class="sheet-footer">
+                    <span>PAGINA 1 - PROTOCOLO MIRAGEM</span>
+                    <span>FICHA DE AGENTE</span>
+                </footer>
+            </section>
+
+            <section class="sheet-page page-two">
+                <h2 class="section-title">TABELA DE PERICIAS</h2>
+                <div class="skills-grid">
+                    <div class="skill-column">
+                        <h3>FISICAS</h3>
+                        <div class="linha-pericia"><label class="label-pericia">Acrobacia <small>{5%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-acrobacia_base" class="input-mini input-base-fixa" value="5" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-acrobacia" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Arremessar <small>{20%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-arremessar_base" class="input-mini input-base-fixa" value="20" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-arremessar" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Atirar (Arma Leve)</label><span class="texto-secundario">Base</span><input type="number" id="pericias-atirar_leve_base" class="input-mini input-base-fixa" value="0" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-atirar_leve" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Atirar (Arma Pesada)</label><span class="texto-secundario">Base</span><input type="number" id="pericias-atirar_pesada_base" class="input-mini input-base-fixa" value="0" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-atirar_pesada" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Atletismo <small>{15%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-atletismo_base" class="input-mini input-base-fixa" value="15" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-atletismo" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Escalar <small>{20%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-escalar_base" class="input-mini input-base-fixa" value="20" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-escalar" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Fortitude <small>{10%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-fortitude_base" class="input-mini input-base-fixa" value="10" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-fortitude" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Furtividade <small>{20%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-furtividade_base" class="input-mini input-base-fixa" value="20" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-furtividade" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Luta (Arma Leve) <small>{15%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-luta_arma_leve_base" class="input-mini input-base-fixa" value="15" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-luta_arma_leve" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Luta (Arma Pesada) <small>{10%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-luta_arma_pesada_base" class="input-mini input-base-fixa" value="10" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-luta_arma_pesada" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Luta (Desarmado) <small>{15%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-luta_desarmado_base" class="input-mini input-base-fixa" value="15" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-luta_desarmado" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Nadar <small>{15%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-nadar_base" class="input-mini input-base-fixa" value="15" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-nadar" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Prestidigitacao <small>{10%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-prestidigitacao_base" class="input-mini input-base-fixa" value="10" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-prestidigitacao" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Reflexos</label><span class="texto-secundario">Base</span><input type="number" id="pericias-reflexos_base" class="input-mini input-base-fixa" value="0" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-reflexos" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Sobrevivencia <small>{10%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-sobrevivencia_base" class="input-mini input-base-fixa" value="10" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-sobrevivencia" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Iniciativa <small>{15%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-iniciativa_base" class="input-mini input-base-fixa" value="15" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-iniciativa" class="input-mini"><span>%</span></div>
+                    </div>
+
+                    <div class="skill-column">
+                        <h3>INTELECTUAIS</h3>
+                        <div class="linha-pericia especial"><label class="label-pericia">Dirigir</label><select id="pericias-dirigir_espec"><option value="">Espec...</option><option value="Aéreo">Aéreo</option><option value="Ágil">Ágil</option><option value="Aquático">Aquático</option><option value="Gerais">Gerais</option><option value="Leves">Leves</option><option value="Pesados">Pesados</option><option value="Rurais">Rurais</option></select><span class="texto-secundario">Base</span><input type="number" id="pericias-dirigir_base" class="input-mini input-base-fixa" value="0" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-dirigir" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Atualidades <small>{20%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-atualidades_base" class="input-mini input-base-fixa" value="20" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-atualidades" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia especial"><label class="label-pericia">Ciencia</label><input type="text" id="pericias-ciencia_espec" placeholder="Espec..."><span class="texto-secundario">Base</span><input type="number" id="pericias-ciencia_base" class="input-mini input-base-fixa" value="0" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-ciencia" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Computador <small>{15%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-computador_base" class="input-mini input-base-fixa" value="15" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-computador" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Credito</label><span class="texto-secundario">Base</span><input type="number" id="pericias-credito_base" class="input-mini input-base-fixa" value="0" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-credito" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Crime</label><span class="texto-secundario">Base</span><input type="number" id="pericias-crime_base" class="input-mini input-base-fixa" value="0" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-crime" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Geografia <small>{5%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-geografia_base" class="input-mini input-base-fixa" value="5" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-geografia" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Historia <small>{5%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-historia_base" class="input-mini input-base-fixa" value="5" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-historia" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Saber do Veu</label><span class="texto-secundario">Base</span><input type="number" id="pericias-saber_veu_base" class="input-mini input-base-fixa" value="0" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-saber_veu" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Lembrar <small>{25%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-lembrar_base" class="input-mini input-base-fixa" value="25" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-lembrar" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Medicina <small>{1%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-medicina_base" class="input-mini input-base-fixa" value="1" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-medicina" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Rep. Eletricos</label><span class="texto-secundario">Base</span><input type="number" id="pericias-reparos_eletricos_base" class="input-mini input-base-fixa" value="0" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-reparos_eletricos" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Rep. Mecanicos</label><span class="texto-secundario">Base</span><input type="number" id="pericias-reparos_mecanicos_base" class="input-mini input-base-fixa" value="0" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-reparos_mecanicos" class="input-mini"><span>%</span></div>
+                    </div>
+
+                    <div class="skill-column">
+                        <h3>SOCIAIS</h3>
+                        <div class="linha-pericia"><label class="label-pericia">Acalmar <small>{30%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-acalmar_base" class="input-mini input-base-fixa" value="30" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-acalmar" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Adestramento <small>{10%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-adestramento_base" class="input-mini input-base-fixa" value="10" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-adestramento" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Intuicao <small>{10%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-intuicao_base" class="input-mini input-base-fixa" value="10" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-intuicao" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia especial"><label class="label-pericia">Artes</label><input type="text" id="pericias-artes_espec" placeholder="Espec..."><span class="texto-secundario">Base</span><input type="number" id="pericias-artes_base" class="input-mini input-base-fixa" value="0" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-artes" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Fama</label><span class="texto-secundario">Base</span><input type="number" id="pericias-fama_base" class="input-mini input-base-fixa" value="0" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-fama" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Intimidacao <small>{15%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-intimidacao_base" class="input-mini input-base-fixa" value="15" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-intimidacao" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Charme <small>{15%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-charme_base" class="input-mini input-base-fixa" value="15" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-charme" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Labia <small>{10%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-labia_base" class="input-mini input-base-fixa" value="10" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-labia" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Encontrar <small>{15%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-encontrar_base" class="input-mini input-base-fixa" value="15" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-encontrar" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Observar <small>{20%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-observar_base" class="input-mini input-base-fixa" value="20" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-observar" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Ouvir <small>{20%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-ouvir_base" class="input-mini input-base-fixa" value="20" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-ouvir" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Primeiros Socorros <small>{30%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-primeiros_socorros_base" class="input-mini input-base-fixa" value="30" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-primeiros_socorros" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Psicanalise <small>{10%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-psicanalise_base" class="input-mini input-base-fixa" value="10" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-psicanalise" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Usar o Veu</label><span class="texto-secundario">Base</span><input type="number" id="pericias-usar_veu_base" class="input-mini input-base-fixa" value="0" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-usar_veu" class="input-mini"><span>%</span></div>
+                        <div class="linha-pericia"><label class="label-pericia">Vontade <small>{25%}</small></label><span class="texto-secundario">Base</span><input type="number" id="pericias-vontade_base" class="input-mini input-base-fixa" value="25" readonly><span>%</span><span class="texto-secundario">Atual</span><input type="number" id="pericias-vontade" class="input-mini"><span>%</span></div>
+                    </div>
+                </div>
+
+                <section id="sessao-tabela-sucessos" class="success-panel">
+                    <h2 class="section-title">TABELA DE SUCESSOS</h2>
+                    <div id="tabela-sucessos-visual" class="success-table-wrap" aria-label="Tabela de sucessos"></div>
+                    <p class="table-legend">R = Rolamento / V = Valor / C = Falha Critica / F = Falha / S = Sucesso Normal / B = Sucesso Bom / E = Sucesso Extremo</p>
+                </section>
+
+                <footer class="sheet-footer">
+                    <span>PAGINA 2 - PROTOCOLO MIRAGEM</span>
+                    <span>FICHA DE AGENTE</span>
+                </footer>
+            </section>
+
+            <section class="sheet-page page-three">
+                <div class="profile-grid">
+                    <label class="boxed-area appearance-box">
+                        <span>APARENCIA</span>
+                        <textarea id="perfil-aparencia" rows="8"></textarea>
+                    </label>
+                    <label class="boxed-area personality-box">
+                        <span>PERSONALIDADE E OBJETIVOS</span>
+                        <textarea id="perfil-personalidade" rows="8"></textarea>
+                    </label>
+                    <label class="boxed-area trauma-box">
+                        <span>TRAUMAS / CICATRIZES / MALDICOES</span>
+                        <textarea id="perfil-traumas" rows="7"></textarea>
+                    </label>
+                </div>
+
+                <div class="resources-grid">
+                    <label class="resource-line">
+                        <span>PATENTE:</span>
+                        <input type="text" id="recursos-patente">
+                    </label>
+                    <label class="resource-line">
+                        <span>CATEGORIA:</span>
+                        <input type="text" id="recursos-categoria">
+                    </label>
+                    <label class="resource-line">
+                        <span>POUPANCA:</span>
+                        <input type="text" id="recursos-poupanca">
+                    </label>
+                    <label class="resource-line">
+                        <span>SALARIO:</span>
+                        <input type="text" id="recursos-salario">
+                    </label>
+                    <label class="boxed-area equipment-box">
+                        <span>EQUIPAMENTOS:</span>
+                        <textarea id="inventario-equipamentos" rows="10"></textarea>
+                    </label>
+                    <label class="boxed-area goods-box">
+                        <span>BENS MATERIAIS:</span>
+                        <textarea id="recursos-bens_materiais" rows="10"></textarea>
+                    </label>
+                    <div class="load-matrix">
+                        <label><span>CARGA LEVE:</span><input type="text" id="recursos-carga_leve"></label>
+                        <label><span>CARGA MODERADA:</span><input type="text" id="recursos-carga_moderada"></label>
+                        <label><span>CARGA MAXIMA:</span><input type="text" id="recursos-carga_maxima"></label>
+                        <label><span>CAPACIDADE DE CARGA:</span><input type="number" id="inventario-carga"></label>
+                        <label><span>PESO TOTAL:</span><input type="text" id="inventario-peso"></label>
+                    </div>
+                </div>
+
+                <footer class="sheet-footer">
+                    <span>PAGINA 3 - PROTOCOLO MIRAGEM</span>
+                    <span>FICHA DE AGENTE</span>
+                </footer>
+            </section>
+
+            <section class="sheet-page page-four">
+                <label class="boxed-area attacks-box">
+                    <span>DESCRICAO DOS EQUIPAMENTOS E ATAQUES:</span>
+                    <textarea id="inventario-descricao" rows="10"></textarea>
+                </label>
+
+                <div class="combat-strip">
+                    <label><span>RD:</span><input type="text" id="combate-rd"></label>
+                    <label><span>DEFESA:</span><input type="text" id="combate-defesa"></label>
+                    <label><span>DB:</span><input type="text" id="combate-db"></label>
+                </div>
+
+                <div class="page-four-grid">
+                    <label class="boxed-area abilities-box">
+                        <span>HABILIDADES</span>
+                        <textarea id="habilidades-lista" rows="20"></textarea>
+                    </label>
+                    <label class="boxed-area corruption-box">
+                        <span>TRANSFORMACOES POR CORRUPCAO</span>
+                        <textarea id="habilidades-transformacoes" rows="12"></textarea>
+                    </label>
+                    <label class="boxed-area mark-box">
+                        <span>MARCA</span>
+                        <textarea id="habilidades-marca" rows="7"></textarea>
+                    </label>
+                </div>
+
+                <label class="boxed-area rituals-box">
+                    <span>RITUAIS</span>
+                    <textarea id="habilidades-rituais" rows="12"></textarea>
+                </label>
+
+                <footer class="sheet-footer">
+                    <span>PAGINA 4 - PROTOCOLO MIRAGEM</span>
+                    <span>FICHA DE AGENTE</span>
+                </footer>
+            </section>
+        </form>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>

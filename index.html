@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Protocolo Miragem - Arquivos</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="dashboard-body">
+    <header class="app-bar">
+      <div>
+        <p class="eyebrow">Arquivos confidenciais</p>
+        <h1>Sistema de Agentes</h1>
+      </div>
+
+      <div class="new-agent-panel">
+        <h3>Registrar Novo Protocolo</h3>
+        <input
+          type="text"
+          id="input-novo-nome"
+          placeholder="Nome do Personagem"
+        />
+        <button class="btn" id="btn-novo-personagem">Criar e Editar Ficha</button>
+      </div>
+    </header>
+
+    <main class="dashboard-main">
+      <h2>Protocolos Ativos</h2>
+      <div id="lista-personagens"></div>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
