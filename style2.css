@@ -1,0 +1,155 @@
+body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  margin: 0;
+  background-color: #000000;
+  background-image: url("og2.png"); /* Foto de Fundo */
+  background-attachment: fixed;
+  background-size: cover;
+  background-position: 50% 40%;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #fff;
+  overflow: hidden;
+}
+.container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 80%;
+  max-width: 800px;
+}
+.heptagrama-img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  opacity: 0.9;
+}
+/* Botão invisível central */
+.center-hidden-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 25%;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  z-index: 5;
+  transition: box-shadow 0.3s ease;
+}
+.center-hidden-btn:hover {
+  box-shadow: inset 0 0 30px rgba(200, 0, 0, 0.2);
+}
+.hidden {
+  display: none !important;
+}
+/* Exemplo de posicionamento absoluto que já utilizo */
+.b1 {
+  position: absolute;
+  top: 50%; /* Centro do Heptagrama */
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  width: 80%;
+  max-width: 400px;
+  z-index: 10;
+}
+
+/* Painel de registo com estética sombria */
+.new-agent-panel-dark {
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid #444;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+.new-agent-panel-dark h3 {
+  margin: 0 0 15px 0;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-family: Georgia, serif;
+  text-shadow: 1px 1px 4px #000;
+}
+.new-agent-panel-dark input {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #666;
+  color: #fff;
+  margin-bottom: 10px;
+  width: 80%;
+  outline: none;
+}
+.new-agent-panel-dark .btn-dark {
+  padding: 10px 20px;
+  background: #222;
+  color: #fff;
+  border: 1px solid #666;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+.new-agent-panel-dark .btn-dark:hover {
+  background: #444;
+}
+
+.lista-personagens-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Estilização dos Botões dos Agentes no Centro do Heptagrama */
+.agent-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #444;
+}
+.agent-center-btn {
+  background: rgba(30, 30, 30, 0.9);
+  border: 1px solid #777;
+  color: #ddd;
+  padding: 12px 20px;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-weight: bold;
+  width: 100%;
+  transition: all 0.3s ease;
+  font-family: Georgia, serif;
+  letter-spacing: 1px;
+}
+.agent-center-btn:hover {
+  background: rgba(70, 70, 70, 0.9);
+  border-color: #fff;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+.agent-delete-btn {
+  background: rgba(100, 20, 20, 0.8);
+  border: 1px solid #f00;
+  color: #fff;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 0.75em;
+  margin-top: 8px;
+  text-transform: uppercase;
+}
+.agent-delete-btn:hover {
+  background: #f00;
+}
