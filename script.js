@@ -234,7 +234,7 @@ if (listaDiv && btnNovo) {
   });
 
   window.abrirFicha = function (id) {
-    window.location.href = `ficha.html?id=${id}`;
+    window.location.assign(`./ficha.html?id=${id}`);
   };
   window.deletarPersonagem = function (id) {
     if (confirm("Excluir permanentemente este agente?")) {
@@ -255,7 +255,7 @@ const formFicha = document.getElementById("form-ficha");
 
 if (formFicha) {
   const urlParams = new URLSearchParams(window.location.search);
-  const agenteId = parseInt(urlParams.get("id"));
+  const agenteId = Number(urlParams.get("id")); // Number() lê IDs gigantes de Date.now() com mais precisão do que parseInt
   let agenteAtual = null;
 
   function carregarFichaNaTela() {
@@ -263,7 +263,7 @@ if (formFicha) {
     agenteAtual = personagens.find((p) => p.id === agenteId);
 
     if (!agenteAtual) {
-      window.location.href = "index.html";
+      window.location.assign("./index.html");
       return;
     }
 
