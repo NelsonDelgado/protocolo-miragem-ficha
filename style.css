@@ -580,6 +580,7 @@ select:focus {
   min-width: 0;
   border: 2px solid var(--line);
   background: rgba(255, 255, 255, 0.54);
+  overflow-x: auto;
 }
 
 .skill-column h3 {
@@ -676,11 +677,15 @@ select:focus {
 .success-panel {
   margin-top: 24px;
   padding-bottom: 40px;
+  width: 100%;
+  overflow: hidden;
 }
 
 .success-table-wrap {
   overflow-x: auto;
   max-width: 100%;
+  width: 100%;
+  display: block;
 }
 
 .success-table {
@@ -767,6 +772,10 @@ select:focus {
 
 .trauma-box textarea {
   min-height: 230px;
+}
+
+.notes-box textarea {
+  min-height: 880px;
 }
 
 .resources-grid {
@@ -1010,9 +1019,7 @@ select:focus {
   .gc-box,
   .resource-line,
   .combat-strip,
-  .combat-strip label,
-  .linha-pericia,
-  .linha-pericia.especial {
+  .combat-strip label {
     grid-template-columns: 1fr;
   }
 

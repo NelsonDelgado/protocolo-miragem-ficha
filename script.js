@@ -140,7 +140,7 @@ function criarAgenteEmBranco(nomeInicial) {
       vontade: 25,
       vontade_base: 25,
     },
-    perfil: { aparencia: "", personalidade: "", traumas: "" },
+    perfil: { aparencia: "", personalidade: "", traumas: "", notas: "" },
     recursos: {
       patente: "",
       categoria: "",
@@ -441,81 +441,3 @@ if (formFicha) {
 
   carregarFichaNaTela();
 }
-
-// ==========================================
-// MÓDULO 3: TABELA DE SUCESSOS VISUAL
-// ==========================================
-function iniciarTabelaSucessos() {
-  try {
-    const tabelaSucessosDiv = document.getElementById("tabela-sucessos-visual");
-    if (!tabelaSucessosDiv) return;
-
-    // Evita duplicar caso já tenha sido desenhada
-    if (tabelaSucessosDiv.querySelector("table")) return;
-
-    tabelaSucessosDiv.innerHTML = ""; // Limpa qualquer resíduo
-
-    function resultadoSucesso(valor, rolamento) {
-      const falhaCritica = valor < 10 ? rolamento >= 19 : rolamento === 20;
-
-      if (falhaCritica) return { letra: "C", classe: "success-critica" };
-      if (rolamento > valor) return { letra: "F", classe: "success-falha" };
-      if (rolamento <= Math.floor(valor / 5))
-        return { letra: "E", classe: "success-extremo" };
-      if (rolamento <= Math.floor(valor / 2))
-        return { letra: "B", classe: "success-bom" };
-      return { letra: "S", classe: "success-normal" };
-    }
-
-    const table = document.createElement("table");
-    table.className = "success-table";
-
-    const thead = document.createElement("thead");
-    const headerRow = document.createElement("tr");
-
-    const thCorner = document.createElement("th");
-    thCorner.className = "axis";
-    thCorner.textContent = "V \\ R";
-    headerRow.appendChild(thCorner);
-
-    for (let rolamento = 1; rolamento <= 20; rolamento++) {
-      const th = document.createElement("th");
-      th.textContent = rolamento;
-      headerRow.appendChild(th);
-    }
-
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-
-    const tbody = document.createElement("tbody");
-
-    for (let valor = 1; valor <= 20; valor++) {
-      const row = document.createElement("tr");
-      const axis = document.createElement("th");
-      axis.className = "axis";
-      axis.textContent = valor;
-      row.appendChild(axis);
-
-      for (let rolamento = 1; rolamento <= 20; rolamento++) {
-        const resultado = resultadoSucesso(valor, rolamento);
-        const cell = document.createElement("td");
-        cell.className = resultado.classe;
-        cell.textContent = resultado.letra;
-        row.appendChild(cell);
-      }
-
-      tbody.appendChild(row);
-    }
-
-    table.appendChild(tbody);
-    tabelaSucessosDiv.appendChild(table);
-  } catch (err) {
-    console.error("Erro ao desenhar a tabela de sucessos:", err);
-  }
-}
-
-// Executa imediatamente
-iniciarTabelaSucessos();
-
-// Tenta executar novamente após a página carregar inteira (fallback seguro)
-window.addEventListener("load", iniciarTabelaSucessos);

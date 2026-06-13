@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ficha do Agente - Protocolo Miragem</title>
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=2" />
   </head>
   <body class="ficha-body">
     <main class="sheet-wrap" style="margin-top: 40px">
@@ -966,6 +966,44 @@
               class="success-table-wrap"
               aria-label="Tabela de sucessos"
             ></div>
+            <script>
+              // Script isolado para garantir que a tabela seja desenhada imediatamente e ignore bloqueios
+              (function () {
+                const tabelaDiv = document.getElementById(
+                  "tabela-sucessos-visual",
+                );
+                if (!tabelaDiv) return;
+                let html =
+                  '<table class="success-table"><thead><tr><th class="axis">V \\ R</th>';
+                for (let r = 1; r <= 20; r++) html += `<th>${r}</th>`;
+                html += "</tr></thead><tbody>";
+                for (let v = 1; v <= 20; v++) {
+                  html += `<tr><th class="axis">${v}</th>`;
+                  for (let r = 1; r <= 20; r++) {
+                    const fc = (v < 10 && r >= 19) || (v >= 10 && r === 20);
+                    let c = "success-falha",
+                      l = "F";
+                    if (fc) {
+                      c = "success-critica";
+                      l = "C";
+                    } else if (r <= Math.floor(v / 5)) {
+                      c = "success-extremo";
+                      l = "E";
+                    } else if (r <= Math.floor(v / 2)) {
+                      c = "success-bom";
+                      l = "B";
+                    } else if (r <= v) {
+                      c = "success-normal";
+                      l = "S";
+                    }
+                    html += `<td class="${c}">${l}</td>`;
+                  }
+                  html += `</tr>`;
+                }
+                html += "</tbody></table>";
+                tabelaDiv.innerHTML = html;
+              })();
+            </script>
             <p class="table-legend">
               R = Rolamento / V = Valor / C = Falha Critica / F = Falha / S =
               Sucesso Normal / B = Sucesso Bom / E = Sucesso Extremo
@@ -1131,6 +1169,18 @@
             <span>FICHA DE AGENTE</span>
           </footer>
         </section>
+
+        <section class="sheet-page page-five">
+          <label class="boxed-area notes-box">
+            <span>NOTAS</span>
+            <textarea id="perfil-notas"></textarea>
+          </label>
+
+          <footer class="sheet-footer">
+            <span>PAGINA 5 - PROTOCOLO MIRAGEM</span>
+            <span>FICHA DE AGENTE</span>
+          </footer>
+        </section>
       </form>
     </main>
 
@@ -1163,6 +1213,6 @@
       </button>
     </div>
 
-    <script src="script.js?v=2"></script>
+    <script src="script.js?v=7"></script>
   </body>
 </html>
