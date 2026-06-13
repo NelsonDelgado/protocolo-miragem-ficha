@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ficha do Agente - Protocolo Miragem</title>
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=2" />
   </head>
   <body class="ficha-body">
     <main class="sheet-wrap" style="margin-top: 40px">
@@ -966,6 +966,44 @@
               class="success-table-wrap"
               aria-label="Tabela de sucessos"
             ></div>
+            <script>
+              // Script isolado para garantir que a tabela seja desenhada imediatamente e ignore bloqueios
+              (function () {
+                const tabelaDiv = document.getElementById(
+                  "tabela-sucessos-visual",
+                );
+                if (!tabelaDiv) return;
+                let html =
+                  '<table class="success-table"><thead><tr><th class="axis">V \\ R</th>';
+                for (let r = 1; r <= 20; r++) html += `<th>${r}</th>`;
+                html += "</tr></thead><tbody>";
+                for (let v = 1; v <= 20; v++) {
+                  html += `<tr><th class="axis">${v}</th>`;
+                  for (let r = 1; r <= 20; r++) {
+                    const fc = (v < 10 && r >= 19) || (v >= 10 && r === 20);
+                    let c = "success-falha",
+                      l = "F";
+                    if (fc) {
+                      c = "success-critica";
+                      l = "C";
+                    } else if (r <= Math.floor(v / 5)) {
+                      c = "success-extremo";
+                      l = "E";
+                    } else if (r <= Math.floor(v / 2)) {
+                      c = "success-bom";
+                      l = "B";
+                    } else if (r <= v) {
+                      c = "success-normal";
+                      l = "S";
+                    }
+                    html += `<td class="${c}">${l}</td>`;
+                  }
+                  html += `</tr>`;
+                }
+                html += "</tbody></table>";
+                tabelaDiv.innerHTML = html;
+              })();
+            </script>
             <p class="table-legend">
               R = Rolamento / V = Valor / C = Falha Critica / F = Falha / S =
               Sucesso Normal / B = Sucesso Bom / E = Sucesso Extremo
@@ -1072,10 +1110,53 @@
               <span>TRANSFORMACOES POR CORRUPCAO</span>
               <textarea id="habilidades-transformacoes" rows="12"></textarea>
             </label>
-            <label class="boxed-area mark-box">
+            <div class="boxed-area mark-box">
               <span>MARCA</span>
-              <textarea id="habilidades-marca" rows="7"></textarea>
-            </label>
+              <input
+                type="file"
+                id="marca-upload"
+                accept="image/*"
+                style="display: none"
+              />
+              <div
+                id="marca-container"
+                title="Clique para anexar a Marca"
+                onclick="document.getElementById('marca-upload').click()"
+                style="
+                  min-height: 190px;
+                  border: 3px solid var(--line);
+                  background: rgba(255, 255, 255, 0.48);
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  overflow: hidden;
+                "
+              >
+                <span
+                  id="marca-placeholder"
+                  style="
+                    color: var(--muted);
+                    font-size: 14px;
+                    text-align: center;
+                    padding: 10px;
+                    font-weight: bold;
+                    text-transform: uppercase;
+                  "
+                  >Clique aqui para anexar a Marca</span
+                >
+                <img
+                  id="marca-preview"
+                  src=""
+                  style="
+                    display: none;
+                    width: 100%;
+                    height: 100%;
+                    object-fit: contain;
+                  "
+                />
+              </div>
+            </div>
           </div>
 
           <label class="boxed-area rituals-box">
@@ -1085,6 +1166,18 @@
 
           <footer class="sheet-footer">
             <span>PAGINA 4 - PROTOCOLO MIRAGEM</span>
+            <span>FICHA DE AGENTE</span>
+          </footer>
+        </section>
+
+        <section class="sheet-page page-five">
+          <label class="boxed-area notes-box">
+            <span>NOTAS</span>
+            <textarea id="perfil-notas"></textarea>
+          </label>
+
+          <footer class="sheet-footer">
+            <span>PAGINA 5 - PROTOCOLO MIRAGEM</span>
             <span>FICHA DE AGENTE</span>
           </footer>
         </section>
@@ -1098,8 +1191,28 @@
       >
         Voltar
       </button>
+      <button
+        class="btn btn-secondary"
+        onclick="exportarFicha()"
+        style="margin-left: 10px"
+      >
+        Exportar Ficha
+      </button>
+      <input
+        type="file"
+        id="importar-ficha-atual"
+        accept=".json"
+        style="display: none"
+      />
+      <button
+        class="btn btn-secondary"
+        onclick="document.getElementById('importar-ficha-atual').click()"
+        style="margin-left: 10px"
+      >
+        Importar Ficha
+      </button>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=7"></script>
   </body>
 </html>

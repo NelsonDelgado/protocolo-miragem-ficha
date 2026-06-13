@@ -28,11 +28,29 @@
           <button class="btn-dark" id="btn-novo-personagem">
             Criar e Editar
           </button>
+
+          <hr
+            style="border: 0; border-top: 1px dashed #444; margin: 15px 10%"
+          />
+
+          <input
+            type="file"
+            id="input-importar"
+            accept=".json"
+            style="display: none"
+          />
+          <button
+            class="btn-dark"
+            onclick="document.getElementById('input-importar').click()"
+            title="Importar arquivo JSON de uma ficha salva"
+          >
+            Importar Ficha
+          </button>
         </div>
         <div id="lista-personagens" class="lista-personagens-container"></div>
       </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=7"></script>
   </body>
 </html>

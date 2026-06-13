@@ -140,7 +140,7 @@ function criarAgenteEmBranco(nomeInicial) {
       vontade: 25,
       vontade_base: 25,
     },
-    perfil: { aparencia: "", personalidade: "", traumas: "" },
+    perfil: { aparencia: "", personalidade: "", traumas: "", notas: "" },
     recursos: {
       patente: "",
       categoria: "",
@@ -153,7 +153,13 @@ function criarAgenteEmBranco(nomeInicial) {
     },
     inventario: { carga: 0, peso: "", equipamentos: "", descricao: "" },
     combate: { rd: "", defesa: "", db: "" },
-    habilidades: { lista: "", transformacoes: "", marca: "", rituais: "" },
+    habilidades: {
+      lista: "",
+      transformacoes: "",
+      marca: "",
+      rituais: "",
+      marca_img: "",
+    },
   };
 }
 
@@ -246,6 +252,33 @@ if (listaDiv && btnNovo) {
   };
 
   renderizarLista();
+
+  // Importação de Ficha via JSON (Página Index)
+  const inputImportar = document.getElementById("input-importar");
+  if (inputImportar) {
+    inputImportar.addEventListener("change", (evento) => {
+      const file = evento.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const dadosImportados = JSON.parse(e.target.result);
+          dadosImportados.id = Date.now(); // Garante que a ficha importada tenha um ID único
+          const personagens = carregarBanco();
+          personagens.push(normalizarAgente(dadosImportados));
+          salvarBanco(personagens);
+          renderizarLista();
+          alert("Ficha importada com sucesso!");
+        } catch (err) {
+          alert(
+            "Erro ao importar a ficha. Verifique se o arquivo JSON é válido.",
+          );
+        }
+        inputImportar.value = ""; // Limpa o input
+      };
+      reader.readAsText(file);
+    });
+  }
 }
 
 // ==========================================
@@ -290,6 +323,17 @@ if (formFicha) {
         }
       }
     });
+
+    // Carregar preview da Imagem da Marca, se existir
+    if (agenteAtual.habilidades && agenteAtual.habilidades.marca_img) {
+      const marcaPreview = document.getElementById("marca-preview");
+      const marcaPlaceholder = document.getElementById("marca-placeholder");
+      if (marcaPreview) {
+        marcaPreview.src = agenteAtual.habilidades.marca_img;
+        marcaPreview.style.display = "block";
+        if (marcaPlaceholder) marcaPlaceholder.style.display = "none";
+      }
+    }
   }
 
   formFicha.addEventListener("input", (evento) => {
@@ -320,66 +364,80 @@ if (formFicha) {
     }
   });
 
+  // Upload de Imagem na Seção da Marca
+  const marcaUpload = document.getElementById("marca-upload");
+  const marcaPreview = document.getElementById("marca-preview");
+  const marcaPlaceholder = document.getElementById("marca-placeholder");
+  if (marcaUpload && marcaPreview) {
+    marcaUpload.addEventListener("change", (evento) => {
+      const file = evento.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64Img = e.target.result;
+        marcaPreview.src = base64Img;
+        marcaPreview.style.display = "block";
+        if (marcaPlaceholder) marcaPlaceholder.style.display = "none";
+
+        if (!agenteAtual) return;
+        if (!agenteAtual.habilidades) agenteAtual.habilidades = {};
+        agenteAtual.habilidades.marca_img = base64Img;
+
+        const personagens = carregarBanco();
+        const index = personagens.findIndex((p) => p.id === agenteId);
+        if (index !== -1) {
+          personagens[index] = agenteAtual;
+          salvarBanco(personagens);
+        }
+      };
+      reader.readAsDataURL(file); // Lê a imagem e converte para texto Base64 compatível com LocalStorage
+    });
+  }
+
+  // Exportar Ficha (Download JSON)
+  window.exportarFicha = function () {
+    if (!agenteAtual) return;
+    const dataStr = JSON.stringify(agenteAtual, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Ficha_${agenteAtual.identidade.nome || "Agente_Desconhecido"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Importar Ficha Atual (Substitui os dados da ficha sendo editada)
+  const inputImportarFicha = document.getElementById("importar-ficha-atual");
+  if (inputImportarFicha) {
+    inputImportarFicha.addEventListener("change", (evento) => {
+      const file = evento.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const dadosImportados = JSON.parse(e.target.result);
+          dadosImportados.id = agenteId; // Mantém o ID atual para sobrescrever a ficha sendo editada
+
+          const personagens = carregarBanco();
+          const index = personagens.findIndex((p) => p.id === agenteId);
+          if (index !== -1) {
+            personagens[index] = normalizarAgente(dadosImportados);
+            salvarBanco(personagens);
+            alert("Ficha importada e atualizada com sucesso!");
+            location.reload(); // Recarrega para aplicar os novos dados na tela
+          }
+        } catch (err) {
+          alert(
+            "Erro ao importar a ficha. Verifique se o arquivo JSON é válido.",
+          );
+        }
+        inputImportarFicha.value = "";
+      };
+      reader.readAsText(file);
+    });
+  }
+
   carregarFichaNaTela();
-}
-
-// ==========================================
-// MÓDULO 3: TABELA DE SUCESSOS VISUAL
-// ==========================================
-const tabelaSucessosDiv = document.getElementById("tabela-sucessos-visual");
-
-if (tabelaSucessosDiv) {
-  function resultadoSucesso(valor, rolamento) {
-    const falhaCritica = valor < 10 ? rolamento >= 19 : rolamento === 20;
-
-    if (falhaCritica) return { letra: "C", classe: "success-critica" };
-    if (rolamento > valor) return { letra: "F", classe: "success-falha" };
-    if (rolamento <= Math.floor(valor / 5))
-      return { letra: "E", classe: "success-extremo" };
-    if (rolamento <= Math.floor(valor / 2))
-      return { letra: "B", classe: "success-bom" };
-    return { letra: "S", classe: "success-normal" };
-  }
-
-  function renderizarTabelaSucessos() {
-    const table = document.createElement("table");
-    table.className = "success-table";
-
-    const thead = document.createElement("thead");
-    const headerRow = document.createElement("tr");
-    headerRow.innerHTML = '<th class="axis">V \\ R</th>';
-
-    for (let rolamento = 1; rolamento <= 20; rolamento++) {
-      const th = document.createElement("th");
-      th.textContent = rolamento;
-      headerRow.appendChild(th);
-    }
-
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-
-    const tbody = document.createElement("tbody");
-
-    for (let valor = 1; valor <= 20; valor++) {
-      const row = document.createElement("tr");
-      const axis = document.createElement("th");
-      axis.textContent = valor;
-      row.appendChild(axis);
-
-      for (let rolamento = 1; rolamento <= 20; rolamento++) {
-        const resultado = resultadoSucesso(valor, rolamento);
-        const cell = document.createElement("td");
-        cell.className = resultado.classe;
-        cell.textContent = resultado.letra;
-        row.appendChild(cell);
-      }
-
-      tbody.appendChild(row);
-    }
-
-    table.appendChild(tbody);
-    tabelaSucessosDiv.appendChild(table);
-  }
-
-  renderizarTabelaSucessos();
 }
