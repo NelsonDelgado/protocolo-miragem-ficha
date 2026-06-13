@@ -675,6 +675,7 @@ select:focus {
 
 .success-panel {
   margin-top: 24px;
+  padding-bottom: 40px;
 }
 
 .success-table-wrap {

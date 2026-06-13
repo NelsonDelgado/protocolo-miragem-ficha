@@ -1072,10 +1072,53 @@
               <span>TRANSFORMACOES POR CORRUPCAO</span>
               <textarea id="habilidades-transformacoes" rows="12"></textarea>
             </label>
-            <label class="boxed-area mark-box">
+            <div class="boxed-area mark-box">
               <span>MARCA</span>
-              <textarea id="habilidades-marca" rows="7"></textarea>
-            </label>
+              <input
+                type="file"
+                id="marca-upload"
+                accept="image/*"
+                style="display: none"
+              />
+              <div
+                id="marca-container"
+                title="Clique para anexar a Marca"
+                onclick="document.getElementById('marca-upload').click()"
+                style="
+                  min-height: 190px;
+                  border: 3px solid var(--line);
+                  background: rgba(255, 255, 255, 0.48);
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  overflow: hidden;
+                "
+              >
+                <span
+                  id="marca-placeholder"
+                  style="
+                    color: var(--muted);
+                    font-size: 14px;
+                    text-align: center;
+                    padding: 10px;
+                    font-weight: bold;
+                    text-transform: uppercase;
+                  "
+                  >Clique aqui para anexar a Marca</span
+                >
+                <img
+                  id="marca-preview"
+                  src=""
+                  style="
+                    display: none;
+                    width: 100%;
+                    height: 100%;
+                    object-fit: contain;
+                  "
+                />
+              </div>
+            </div>
           </div>
 
           <label class="boxed-area rituals-box">
@@ -1098,8 +1141,28 @@
       >
         Voltar
       </button>
+      <button
+        class="btn btn-secondary"
+        onclick="exportarFicha()"
+        style="margin-left: 10px"
+      >
+        Exportar Ficha
+      </button>
+      <input
+        type="file"
+        id="importar-ficha-atual"
+        accept=".json"
+        style="display: none"
+      />
+      <button
+        class="btn btn-secondary"
+        onclick="document.getElementById('importar-ficha-atual').click()"
+        style="margin-left: 10px"
+      >
+        Importar Ficha
+      </button>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=2"></script>
   </body>
 </html>
