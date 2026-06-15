@@ -251,6 +251,51 @@ const btnLogin = document.getElementById("btn-login");
 const btnLogout = document.getElementById("btn-logout");
 const userEmailEl = document.getElementById("user-email");
 
+async function migrarDadosAntigosParaFirebase() {
+  const CHAVE_BANCO = "protocoloMiragemAgentes";
+  const dadosLocais = localStorage.getItem(CHAVE_BANCO);
+  if (!dadosLocais) return; // Se não houver dados antigos, não faz nada
+
+  try {
+    const personagensAntigos = JSON.parse(dadosLocais);
+    if (Array.isArray(personagensAntigos) && personagensAntigos.length > 0) {
+      alert(
+        "Detetámos fichas antigas no seu dispositivo! A migrá-las para a sua conta na nuvem...",
+      );
+
+      // Cria uma campanha especial para guardar as fichas velhas
+      const campaignId = Math.random()
+        .toString(36)
+        .substring(2, 8)
+        .toUpperCase();
+      await setDoc(doc(db, "campaigns", campaignId), {
+        name: "Arquivo Local (Fichas Antigas)",
+        masterId: currentUser.uid,
+        playerIds: [],
+      });
+
+      // Envia as fichas uma a uma para essa campanha
+      for (const p of personagensAntigos) {
+        const agenteMigrado = normalizarAgente(p);
+        agenteMigrado.userId = currentUser.uid;
+        agenteMigrado.campaignId = campaignId;
+        await setDoc(
+          doc(db, "agentes", String(agenteMigrado.id)),
+          agenteMigrado,
+        );
+      }
+
+      // Limpa a cache antiga para este código não voltar a rodar no futuro
+      localStorage.removeItem(CHAVE_BANCO);
+      alert(
+        "Migração concluída com sucesso! As suas fichas antigas estão na campanha 'Arquivo Local'.",
+      );
+    }
+  } catch (e) {
+    console.error("Erro na migração:", e);
+  }
+}
+
 if (loginView) {
   // Observador do estado de autenticação
   onAuthStateChanged(auth, (user) => {
@@ -259,7 +304,11 @@ if (loginView) {
       loginView.classList.add("hidden");
       dashboardView.classList.remove("hidden");
       userEmailEl.textContent = user.displayName || user.email;
-      setupCampaignListeners();
+
+      // Corre o migrador primeiro, e só depois liga os ouvintes da campanha
+      migrarDadosAntigosParaFirebase().then(() => {
+        setupCampaignListeners();
+      });
     } else {
       currentUser = null;
       loginView.classList.remove("hidden");
