@@ -70,14 +70,27 @@
 
         <!-- LISTA DE PERSONAGENS (DENTRO DE UMA CAMPANHA) -->
         <div id="agents-view" class="b1 hidden">
-          <button
-            id="btn-back-to-campaigns"
-            class="btn-dark"
-            style="margin-bottom: 15px"
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              width: 100%;
+              margin-bottom: 15px;
+            "
           >
-            &larr; Voltar para Campanhas
-          </button>
-          <div class="new-agent-panel-dark">
+            <button id="btn-back-to-campaigns" class="btn-dark">
+              &larr; Voltar para Campanhas
+            </button>
+            <button
+              id="btn-escudo-mestre"
+              class="btn-dark hidden"
+              style="background: #5a0000; border-color: #ff4444; color: #fff"
+            >
+              🛡️ Escudo do Mestre
+            </button>
+          </div>
+          <div class="new-agent-panel-dark" style="margin-bottom: 20px">
             <h3>Registrar Novo Protocolo</h3>
             <input
               type="text"
@@ -91,6 +104,17 @@
           <div id="lista-personagens" class="lista-personagens-container"></div>
         </div>
       </div>
+    </div>
+
+    <!-- ESCUDO DO MESTRE (MODAL/OVERLAY) -->
+    <div id="escudo-mestre-overlay" class="hidden">
+      <div class="escudo-mestre-header">
+        <h2>🛡️ ESCUDO DO MESTRE</h2>
+        <button id="btn-close-escudo" class="btn-dark" style="background: #333">
+          Fechar ❌
+        </button>
+      </div>
+      <div id="escudo-mestre-content" class="agents-grid"></div>
     </div>
 
     <script type="module" src="script.js?v=9"></script>

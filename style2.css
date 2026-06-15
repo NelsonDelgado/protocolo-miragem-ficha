@@ -72,6 +72,11 @@ body {
   z-index: 10;
 }
 
+#agents-view.b1 {
+  max-width: 900px;
+  width: 95%;
+}
+
 /* Painel de registo com estética sombria */
 .new-agent-panel-dark {
   background: rgba(0, 0, 0, 0.85);
@@ -160,4 +165,337 @@ body {
 }
 .agent-delete-btn:hover {
   background: #f00;
+}
+
+/* Grelha de Personagens da Campanha */
+.agents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  width: 100%;
+  align-items: stretch;
+}
+
+.agent-card {
+  display: flex;
+  background: #181818;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  border: 1px solid #333;
+}
+
+.agent-card-left {
+  width: 120px;
+  background: #252525;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.agent-card-left img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.agent-card-right {
+  flex: 1;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.agent-card-name {
+  font-size: 18px;
+  font-weight: bold;
+  margin: 0 0 5px 0;
+  color: #fff;
+}
+
+.agent-card-role {
+  font-size: 13px;
+  color: #ccc;
+  margin: 0 0 5px 0;
+}
+
+.agent-card-date {
+  font-size: 11px;
+  color: #777;
+  margin: 0;
+}
+
+.simple-card-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.agent-card-btn {
+  align-self: flex-start;
+  background: #8a2be2;
+  color: #fff;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 11px;
+  text-transform: uppercase;
+  transition: background 0.2s;
+}
+
+.agent-card-btn:hover {
+  background: #9b30ff;
+}
+
+.agent-card-settings {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 16px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  line-height: 1;
+}
+
+.agent-card-settings:hover {
+  color: #aaa;
+}
+
+/* =========================================
+   ESCUDO DO MESTRE (Ecrã / Overlay)
+========================================= */
+#escudo-mestre-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 15, 15, 0.96);
+  z-index: 9999;
+  padding: 30px;
+  overflow-y: auto;
+  backdrop-filter: blur(8px);
+  box-sizing: border-box;
+}
+
+.escudo-mestre-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto 30px auto;
+  border-bottom: 2px solid #333;
+  padding-bottom: 15px;
+}
+
+.escudo-mestre-header h2 {
+  margin: 0;
+  font-family: Georgia, serif;
+  letter-spacing: 2px;
+  color: #fff;
+}
+
+#escudo-mestre-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* =========================================
+   VISÃO DO MESTRE (Cartão Detalhado)
+========================================= */
+.agent-card.master-card {
+  flex-direction: column;
+  background: #1c1f22;
+  padding: 15px;
+  border: 1px solid #333;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+}
+
+.mc-header {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.mc-foto {
+  width: 70px;
+  height: 70px;
+  background: #252525;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mc-foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mc-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+}
+
+.mc-name {
+  font-size: 18px;
+  margin: 0 0 4px 0;
+  color: #e0e0e0;
+}
+
+.mc-role {
+  font-size: 13px;
+  color: #aaa;
+  margin: 0 0 4px 0;
+}
+
+.mc-level {
+  font-size: 12px;
+  font-weight: bold;
+  color: #ccc;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.mc-attributes {
+  display: flex;
+  justify-content: space-between;
+  text-align: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #333;
+}
+
+.mc-attributes div {
+  display: flex;
+  flex-direction: column;
+}
+
+.mc-attributes span {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.mc-attributes strong {
+  font-size: 16px;
+  color: #ddd;
+}
+
+.mc-status-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #333;
+}
+
+.mc-bar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mc-bar-label {
+  font-size: 11px;
+  color: #aaa;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.mc-bar-bg {
+  width: 100%;
+  height: 22px;
+  background: #111;
+  border: 1px solid #444;
+  position: relative;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.mc-bar-fill {
+  height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  transition: width 0.3s ease;
+}
+
+.mc-bar-fill.pv-fill {
+  background: #8b0000;
+}
+
+.mc-bar-fill.pd-fill {
+  background: #006080;
+}
+
+.mc-bar-text {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+  line-height: 22px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 1px 1px 2px #000;
+  z-index: 2;
+}
+
+.mc-combat {
+  display: flex;
+  justify-content: space-around;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.mc-combat div {
+  display: flex;
+  flex-direction: column;
+}
+
+.mc-combat span {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.mc-combat strong {
+  font-size: 18px;
+  color: #ddd;
+}
+
+.mc-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 5px;
+  border-top: 1px solid #222;
+  padding-top: 10px;
+}
+
+.mc-btn-ficha {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.mc-btn-ficha:hover {
+  color: #fff;
 }
