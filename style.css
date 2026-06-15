@@ -336,42 +336,42 @@ select:focus {
 
 .attr-carisma {
   left: 50%;
-  top: 16%;
+  top: 18%;
   transform: translate(-50%, -50%);
 }
 .attr-sabedoria {
-  left: 77%;
+  left: 75%;
   top: 29%;
   transform: translate(-50%, -50%);
 }
 .attr-agilidade {
-  left: 83.5%;
-  top: 58%;
+  left: 80%;
+  top: 55%;
   transform: translate(-50%, -50%);
 }
 .attr-corpo {
-  left: 65%;
-  top: 81%;
+  left: 63.5%;
+  top: 75.5%;
   transform: translate(-50%, -50%);
 }
 .attr-vigor {
-  left: 35%;
-  top: 81%;
+  left: 36.5%;
+  top: 75.5%;
   transform: translate(-50%, -50%);
 }
 .attr-inteligencia {
-  left: 16.5%;
-  top: 58%;
+  left: 20%;
+  top: 55%;
   transform: translate(-50%, -50%);
 }
 .attr-forca {
-  left: 23%;
+  left: 25%;
   top: 29%;
   transform: translate(-50%, -50%);
 }
 .attribute-core {
   left: 50%;
-  top: 50%;
+  top: 52.5%;
   transform: translate(-50%, -50%);
 }
 
@@ -526,6 +526,7 @@ select:focus {
   display: flex;
   border: 2px solid var(--ink);
   border-top: none;
+  border-right: none;
   background: #d6d6d6;
   height: 32px;
   align-items: center;
@@ -546,6 +547,7 @@ select:focus {
   height: 100%;
   border: none;
   border-left: 2px solid var(--ink);
+  border-right: 2px solid var(--ink);
   background: #fff;
   text-align: center;
   font-weight: bold;
@@ -669,12 +671,15 @@ select:focus {
   background: #dcdcdc;
   color: #555;
   cursor: not-allowed;
+}
+
+/* Remove as setinhas de aumentar/diminuir de TODOS os campos numéricos */
+input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
-
-.input-base-fixa::-webkit-inner-spin-button,
-.input-base-fixa::-webkit-outer-spin-button {
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }

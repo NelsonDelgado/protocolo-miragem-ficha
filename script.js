@@ -1081,6 +1081,12 @@ if (formFicha) {
           const dadosImportados = JSON.parse(e.target.result);
           dadosImportados.id = agenteId; // Mantém o ID atual para sobrescrever a ficha sendo editada
 
+          // Garante que a ficha não mude de dono nem de campanha caso o JSON seja de outra sessão
+          if (agenteAtual) {
+            dadosImportados.campaignId = agenteAtual.campaignId;
+            dadosImportados.userId = agenteAtual.userId;
+          }
+
           await salvarAgenteNuvem(normalizarAgente(dadosImportados));
           alert("Ficha importada e atualizada com sucesso!");
           location.reload(); // Recarrega para aplicar os novos dados na tela
