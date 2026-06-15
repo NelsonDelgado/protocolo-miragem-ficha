@@ -553,6 +553,19 @@ if (campaignDashboard) {
 const listaDiv = document.getElementById("lista-personagens");
 const btnNovo = document.getElementById("btn-novo-personagem");
 const inputNovoNome = document.getElementById("input-novo-nome");
+const btnEscudoMestre = document.getElementById("btn-escudo-mestre");
+const escudoMestreOverlay = document.getElementById("escudo-mestre-overlay");
+const btnCloseEscudo = document.getElementById("btn-close-escudo");
+const escudoMestreContent = document.getElementById("escudo-mestre-content");
+
+if (btnEscudoMestre && escudoMestreOverlay && btnCloseEscudo) {
+  btnEscudoMestre.addEventListener("click", () => {
+    escudoMestreOverlay.classList.remove("hidden");
+  });
+  btnCloseEscudo.addEventListener("click", () => {
+    escudoMestreOverlay.classList.add("hidden");
+  });
+}
 
 async function renderizarListaAgentes() {
   if (!currentCampaignId || !listaDiv) return;
@@ -571,8 +584,16 @@ async function renderizarListaAgentes() {
 
     if (querySnapshot.empty) {
       listaDiv.innerHTML = `<p style="color:#aaa; text-align:center;">Nenhum agente registrado nesta campanha.</p>`;
+      if (escudoMestreContent) escudoMestreContent.innerHTML = "";
       return;
     }
+
+    if (btnEscudoMestre) {
+      if (isCurrentUserMaster) btnEscudoMestre.classList.remove("hidden");
+      else btnEscudoMestre.classList.add("hidden");
+    }
+
+    if (escudoMestreContent) escudoMestreContent.innerHTML = "";
 
     querySnapshot.forEach((docSnap) => {
       const agente = docSnap.data();
@@ -604,10 +625,80 @@ async function renderizarListaAgentes() {
             <h4 class="agent-card-name">${agente.identidade.nome || "Desconhecido"}</h4>
             <p class="agent-card-role">${agente.identidade.ocupacao || "Sem Ocupação"}</p>
             <p class="agent-card-date">Registrado em ${dataReg}</p>
-            ${acessarButtonHtml}
+            <div class="simple-card-actions">
+              ${acessarButtonHtml}
+            </div>
           </div>
         `;
       listaDiv.appendChild(wrapper);
+
+      // --- Constrói o cartão APENAS para a tela "Escudo do Mestre" ---
+      if (isCurrentUserMaster && escudoMestreContent) {
+        const attr = agente.atributos || {};
+        const st = agente.status || {};
+        const ident = agente.identidade || {};
+        const comb = agente.combate || {};
+
+        const pvMax = Number(st.pv_max) || 1;
+        const pvPerc = Math.min(
+          100,
+          Math.max(0, ((Number(st.pv) || 0) / pvMax) * 100),
+        );
+
+        const pdMax = Number(st.pd_max) || 1;
+        const pdPerc = Math.min(
+          100,
+          Math.max(0, ((Number(st.pd) || 0) / pdMax) * 100),
+        );
+
+        const masterCard = document.createElement("div");
+        masterCard.className = "master-card";
+
+        masterCard.innerHTML = `
+            <div class="mc-header">
+              <div class="mc-foto">${fotoHtml}</div>
+              <div class="mc-info">
+                <h4 class="mc-name">${ident.nome || "Desconhecido"}</h4>
+                <p class="mc-role">${ident.ocupacao || "Sem Ocupação"}</p>
+                <p class="mc-level">NÍVEL: ${ident.total_niveis || "0"}</p>
+              </div>
+            </div>
+            <div class="mc-attributes">
+              <div><span>AGI</span><strong>${attr.agilidade || 0}</strong></div>
+              <div><span>FOR</span><strong>${attr.forca || 0}</strong></div>
+              <div><span>INT</span><strong>${attr.inteligencia || 0}</strong></div>
+              <div><span>VIG</span><strong>${attr.vigor || 0}</strong></div>
+              <div><span>COR</span><strong>${attr.corpo || 0}</strong></div>
+              <div><span>CAR</span><strong>${attr.carisma || 0}</strong></div>
+              <div><span>SAB</span><strong>${attr.sabedoria || 0}</strong></div>
+            </div>
+            <div class="mc-status-bars">
+              <div class="mc-bar-container">
+                <div class="mc-bar-label">VIDA</div>
+                <div class="mc-bar-bg">
+                  <div class="mc-bar-fill pv-fill" style="width: ${pvPerc}%"></div>
+                  <div class="mc-bar-text">${st.pv || 0} / ${st.pv_max || 0}</div>
+                </div>
+              </div>
+              <div class="mc-bar-container">
+                <div class="mc-bar-label">DETERMINAÇÃO</div>
+                <div class="mc-bar-bg">
+                  <div class="mc-bar-fill pd-fill" style="width: ${pdPerc}%"></div>
+                  <div class="mc-bar-text">${st.pd || 0} / ${st.pd_max || 0}</div>
+                </div>
+              </div>
+            </div>
+            <div class="mc-combat">
+              <div><span>DEFESA</span><strong>${comb.defesa || 0}</strong></div>
+              <div><span>RD</span><strong>${comb.rd || 0}</strong></div>
+              <div><span>DB</span><strong>${comb.db || 0}</strong></div>
+            </div>
+            <div class="mc-footer">
+              <button class="mc-btn-ficha" onclick="abrirFicha('${agente.id}', true)">Abrir Ficha do Agente</button>
+            </div>
+        `;
+        escudoMestreContent.appendChild(masterCard);
+      }
     });
   } catch (error) {
     console.error("Erro ao carregar lista de agentes:", error);
