@@ -7,50 +7,92 @@
     <link rel="stylesheet" href="style2.css" />
   </head>
   <body>
-    <div class="container">
-      <img src="heptagrama.png" alt="Heptagrama" class="heptagrama-img" />
+    <div id="app-container">
+      <!-- TELA DE LOGIN (ESTADO INICIAL) -->
+      <div id="login-view">
+        <div class="container">
+          <img src="heptagrama.png" alt="Heptagrama" class="heptagrama-img" />
+          <button
+            id="btn-login"
+            class="center-hidden-btn"
+            title="Autenticar"
+          ></button>
+        </div>
+        <p
+          id="login-message"
+          style="text-align: center; color: #888; margin-top: -50px"
+        >
+          Clique no centro para autenticar
+        </p>
+      </div>
 
-      <button
-        id="btn-entrar-circulo"
-        class="center-hidden-btn"
-        aria-label="Entrar no Círculo"
-        title="Entrar no Círculo"
-      ></button>
-
-      <div id="painel-agentes" class="b1 hidden">
-        <div class="new-agent-panel-dark">
-          <h3>Registrar Novo Protocolo</h3>
-          <input
-            type="text"
-            id="input-novo-nome"
-            placeholder="Nome do Personagem"
-          />
-          <button class="btn-dark" id="btn-novo-personagem">
-            Criar e Editar
+      <!-- DASHBOARD PRINCIPAL (APÓS LOGIN) -->
+      <div id="dashboard-view" class="hidden">
+        <div style="position: absolute; top: 20px; right: 20px; z-index: 20">
+          <span id="user-email" style="margin-right: 15px; color: #aaa"></span>
+          <button id="btn-logout" class="btn-dark" style="padding: 8px 12px">
+            Sair
           </button>
+        </div>
 
+        <!-- SELETOR DE CAMPANHAS -->
+        <div id="campaign-dashboard" class="b1">
+          <h3>Suas Campanhas</h3>
+          <div id="campaign-list" class="lista-personagens-container"></div>
           <hr
             style="border: 0; border-top: 1px dashed #444; margin: 15px 10%"
           />
-
-          <input
-            type="file"
-            id="input-importar"
-            accept=".json"
-            style="display: none"
-          />
-          <button
-            class="btn-dark"
-            onclick="document.getElementById('input-importar').click()"
-            title="Importar arquivo JSON de uma ficha salva"
+          <div
+            class="new-agent-panel-dark"
+            style="background: transparent; border: none; padding: 0"
           >
-            Importar Ficha
-          </button>
+            <input
+              type="text"
+              id="input-campaign-name"
+              placeholder="Nome da Nova Campanha"
+            />
+            <button id="btn-create-campaign" class="btn-dark">
+              Criar Campanha
+            </button>
+            <hr
+              style="border: 0; border-top: 1px dashed #444; margin: 15px 10%"
+            />
+            <input
+              type="text"
+              id="input-campaign-code"
+              placeholder="Código para Entrar"
+            />
+            <button id="btn-join-campaign" class="btn-dark">
+              Entrar na Campanha
+            </button>
+          </div>
         </div>
-        <div id="lista-personagens" class="lista-personagens-container"></div>
+
+        <!-- LISTA DE PERSONAGENS (DENTRO DE UMA CAMPANHA) -->
+        <div id="agents-view" class="b1 hidden">
+          <button
+            id="btn-back-to-campaigns"
+            class="btn-dark"
+            style="margin-bottom: 15px"
+          >
+            &larr; Voltar para Campanhas
+          </button>
+          <div class="new-agent-panel-dark">
+            <h3>Registrar Novo Protocolo</h3>
+            <input
+              type="text"
+              id="input-novo-nome"
+              placeholder="Nome do Personagem"
+            />
+            <button class="btn-dark" id="btn-novo-personagem">
+              Criar e Editar
+            </button>
+          </div>
+          <div id="lista-personagens" class="lista-personagens-container"></div>
+        </div>
       </div>
     </div>
 
-    <script src="script.js?v=7"></script>
+    <script type="module" src="script.js?v=9"></script>
   </body>
 </html>

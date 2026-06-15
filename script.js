@@ -1,21 +1,76 @@
 // ==========================================
-// CONFIGURAÇÕES E BANCO DE DADOS (LOCALSTORAGE)
+// CONFIGURAÇÕES E BANCO DE DADOS (FIREBASE)
 // ==========================================
-const CHAVE_BANCO = "protocoloMiragemAgentes";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  doc,
+  getDoc,
+  setDoc,
+  deleteDoc,
+  query,
+  onSnapshot,
+  where,
+  arrayUnion,
+  writeBatch,
+  updateDoc,
+} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  onAuthStateChanged,
+  signOut,
+} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-function carregarBanco() {
-  const dados = localStorage.getItem(CHAVE_BANCO);
-  return dados ? JSON.parse(dados) : [];
+const firebaseConfig = {
+  // Dados de autenticacao firebase
+  apiKey: "AIzaSyAgFIBWXG8rS0QrQLppRYK7L8saDc4apuc", // API Key
+  authDomain: "protocolo-miragem.firebaseapp.com",
+  projectId: "protocolo-miragem",
+  storageBucket: "protocolo-miragem.firebasestorage.app",
+  messagingSenderId: "809809431579",
+  appId: "1:809809431579:web:1d1c36bf24f73896e1fcbe",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+// Estado Global da Aplicação
+let currentUser = null;
+let currentCampaignId = null;
+let isCurrentUserMaster = false;
+let masterCampaignsUnsubscribe = null;
+let playerCampaignsUnsubscribe = null;
+
+// Sistema de "Debounce" para não estourar os limites gratuitos de banco de dados
+let saveTimeout;
+async function salvarAgenteNuvem(agente) {
+  try {
+    await setDoc(doc(db, "agentes", String(agente.id)), agente);
+  } catch (e) {
+    console.error("Erro ao salvar na nuvem:", e);
+  }
 }
 
-function salvarBanco(personagens) {
-  localStorage.setItem(CHAVE_BANCO, JSON.stringify(personagens));
+function salvarAgenteDebounced(agente) {
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    salvarAgenteNuvem(agente);
+  }, 1500); // Salva 1,5 segundos após o usuário parar de interagir
 }
 
 // Objeto base inicializa o "Atual" igual à Base predefinida nas regras
 function criarAgenteEmBranco(nomeInicial) {
+  const newId = Date.now();
   return {
-    id: Date.now(),
+    id: newId,
+    userId: currentUser ? currentUser.uid : "desconhecido", // Vincula a ficha ao utilizador atual
+    campaignId:
+      typeof currentCampaignId !== "undefined" ? currentCampaignId : null, // Vincula a ficha à campanha atual
     identidade: {
       nome: nomeInicial || "Agente Desconhecido",
       player: "",
@@ -188,97 +243,372 @@ function normalizarAgente(agente) {
 }
 
 // ==========================================
-// MÓDULO 1: PÁGINA INICIAL (DASHBOARD)
+// MÓDULO 0: AUTENTICAÇÃO E CONTROLE DE VIEW
+// ==========================================
+const loginView = document.getElementById("login-view");
+const dashboardView = document.getElementById("dashboard-view");
+const btnLogin = document.getElementById("btn-login");
+const btnLogout = document.getElementById("btn-logout");
+const userEmailEl = document.getElementById("user-email");
+
+async function migrarDadosAntigosParaFirebase() {
+  const CHAVE_BANCO = "protocoloMiragemAgentes";
+  const dadosLocais = localStorage.getItem(CHAVE_BANCO);
+  if (!dadosLocais) return; // Se não houver dados antigos, não faz nada
+
+  try {
+    const personagensAntigos = JSON.parse(dadosLocais);
+    if (Array.isArray(personagensAntigos) && personagensAntigos.length > 0) {
+      alert(
+        "Detetámos fichas antigas no seu dispositivo! A migrá-las para a sua conta na nuvem...",
+      );
+
+      // Cria uma campanha especial para guardar as fichas velhas
+      const campaignId = Math.random()
+        .toString(36)
+        .substring(2, 8)
+        .toUpperCase();
+      await setDoc(doc(db, "campaigns", campaignId), {
+        name: "Arquivo Local (Fichas Antigas)",
+        masterId: currentUser.uid,
+        playerIds: [],
+      });
+
+      // Envia as fichas uma a uma para essa campanha
+      for (const p of personagensAntigos) {
+        const agenteMigrado = normalizarAgente(p);
+        agenteMigrado.userId = currentUser.uid;
+        agenteMigrado.campaignId = campaignId;
+        await setDoc(
+          doc(db, "agentes", String(agenteMigrado.id)),
+          agenteMigrado,
+        );
+      }
+
+      // Limpa a cache antiga para este código não voltar a rodar no futuro
+      localStorage.removeItem(CHAVE_BANCO);
+      alert(
+        "Migração concluída com sucesso! As suas fichas antigas estão na campanha 'Arquivo Local'.",
+      );
+    }
+  } catch (e) {
+    console.error("Erro na migração:", e);
+  }
+}
+
+if (loginView) {
+  // Observador do estado de autenticação
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      currentUser = user;
+      loginView.classList.add("hidden");
+      dashboardView.classList.remove("hidden");
+      userEmailEl.textContent = user.displayName || user.email;
+
+      // Corre o migrador primeiro, e só depois liga os ouvintes da campanha
+      migrarDadosAntigosParaFirebase().then(() => {
+        setupCampaignListeners();
+      });
+    } else {
+      currentUser = null;
+      loginView.classList.remove("hidden");
+      dashboardView.classList.add("hidden");
+      unsubscribeCampaignListeners();
+    }
+  });
+
+  // Evento de Login
+  btnLogin.addEventListener("click", async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Erro na autenticação:", error);
+      alert("Falha ao fazer login.");
+    }
+  });
+
+  // Evento de Logout
+  btnLogout.addEventListener("click", async () => {
+    await signOut(auth);
+  });
+}
+
+// ==========================================
+// MÓDULO 1: DASHBOARD DE CAMPANHAS
+// ==========================================
+const campaignDashboard = document.getElementById("campaign-dashboard");
+const agentsView = document.getElementById("agents-view");
+const campaignListDiv = document.getElementById("campaign-list");
+const btnCreateCampaign = document.getElementById("btn-create-campaign");
+const inputCampaignName = document.getElementById("input-campaign-name");
+const btnJoinCampaign = document.getElementById("btn-join-campaign");
+const inputCampaignCode = document.getElementById("input-campaign-code");
+const btnBackToCampaigns = document.getElementById("btn-back-to-campaigns");
+
+// Funcões Globais para Campanhas
+function unsubscribeCampaignListeners() {
+  if (masterCampaignsUnsubscribe) {
+    masterCampaignsUnsubscribe();
+    masterCampaignsUnsubscribe = null;
+  }
+  if (playerCampaignsUnsubscribe) {
+    playerCampaignsUnsubscribe();
+    playerCampaignsUnsubscribe = null;
+  }
+  if (campaignListDiv) campaignListDiv.innerHTML = "";
+}
+
+function setupCampaignListeners() {
+  if (!currentUser || !campaignListDiv) return;
+  unsubscribeCampaignListeners(); // Garante que não haja ouvintes duplicados
+
+  campaignListDiv.innerHTML = `<p style="color:#aaa; text-align:center;">A procurar campanhas...</p>`;
+  const campaigns = new Map();
+
+  function renderCampaignList() {
+    if (campaigns.size === 0) {
+      campaignListDiv.innerHTML = `<p style="color:#aaa; text-align:center;">Nenhuma campanha encontrada.</p>`;
+      return;
+    }
+
+    campaignListDiv.innerHTML = "";
+    // Ordena as campanhas por nome para uma exibição consistente
+    const sortedCampaigns = [...campaigns.entries()].sort((a, b) =>
+      a[1].name.localeCompare(b[1].name),
+    );
+
+    sortedCampaigns.forEach(([id, data]) => {
+      const campaignEl = document.createElement("div");
+      campaignEl.className = "agent-wrapper";
+      const masterBadge = data.isMaster
+        ? '<span style="color:gold;font-size:12px;">[MESTRE]</span>'
+        : "";
+      const deleteBtn = data.isMaster
+        ? `<button class="agent-delete-btn" onclick="deletarCampanha('${id}')" style="margin-top: 5px;">Apagar</button>`
+        : "";
+      campaignEl.innerHTML = `
+          <button class="agent-center-btn" onclick="abrirCampanha('${id}', ${data.isMaster})">
+            ${data.name} ${masterBadge}
+          </button>
+          <small style="color:#777; margin-top: 5px;">Código: ${id}</small>
+          ${deleteBtn}
+        `;
+      campaignListDiv.appendChild(campaignEl);
+    });
+  }
+
+  // Query para campanhas onde o utilizador é Mestre
+  const masterQuery = query(
+    collection(db, "campaigns"),
+    where("masterId", "==", currentUser.uid),
+  );
+  masterCampaignsUnsubscribe = onSnapshot(
+    masterQuery,
+    (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "removed") {
+          campaigns.delete(change.doc.id);
+        } else {
+          campaigns.set(change.doc.id, {
+            ...change.doc.data(),
+            isMaster: true,
+          });
+        }
+      });
+      renderCampaignList();
+    },
+    (error) => {
+      console.error("Erro ao procurar campanhas Mestre:", error);
+      campaignListDiv.innerHTML = `<p style="color:red; text-align:center;">Erro ao conectar. Verifique as regras do Firebase.</p>`;
+    },
+  );
+
+  // Query para campanhas onde o utilizador é Jogador
+  const playerQuery = query(
+    collection(db, "campaigns"),
+    where("playerIds", "array-contains", currentUser.uid),
+  );
+  playerCampaignsUnsubscribe = onSnapshot(
+    playerQuery,
+    (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "removed") {
+          campaigns.delete(change.doc.id);
+        } else {
+          // Adiciona apenas se já não estiver na lista como Mestre (evita duplicados)
+          if (!campaigns.has(change.doc.id)) {
+            campaigns.set(change.doc.id, {
+              ...change.doc.data(),
+              isMaster: false,
+            });
+          }
+        }
+      });
+      renderCampaignList();
+    },
+    (error) => {
+      console.error("Erro ao procurar campanhas Jogador:", error);
+    },
+  );
+}
+
+if (campaignDashboard) {
+  btnCreateCampaign.addEventListener("click", async () => {
+    const name = inputCampaignName.value.trim();
+    if (!name) return alert("Dê um nome à campanha.");
+
+    // Gera um código de 6 caracteres para a campanha
+    const campaignId = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    await setDoc(doc(db, "campaigns", campaignId), {
+      name: name,
+      masterId: currentUser.uid,
+      playerIds: [],
+    });
+
+    inputCampaignName.value = "";
+  });
+
+  btnJoinCampaign.addEventListener("click", async () => {
+    const code = inputCampaignCode.value.trim().toUpperCase();
+    if (!code) return alert("Insira um código de campanha.");
+
+    // Dá feedback visual de que está a carregar
+    btnJoinCampaign.innerText = "A entrar...";
+    btnJoinCampaign.disabled = true;
+
+    try {
+      const campaignRef = doc(db, "campaigns", code);
+
+      // Ao invés de ler (o que é bloqueado), tentamos forçar a atualização direta.
+      // Se a campanha não existir ou a regra barrar, cairá direto no catch abaixo.
+      await updateDoc(campaignRef, { playerIds: arrayUnion(currentUser.uid) });
+
+      alert("Entrou na campanha com sucesso!");
+      inputCampaignCode.value = "";
+    } catch (error) {
+      console.error("Erro ao entrar:", error);
+      alert(
+        "Erro! Verifique se o código está correto (ou se já faz parte desta campanha).",
+      );
+    } finally {
+      btnJoinCampaign.innerText = "Entrar na Campanha";
+      btnJoinCampaign.disabled = false;
+    }
+  });
+
+  btnBackToCampaigns.addEventListener("click", () => {
+    agentsView.classList.add("hidden");
+    campaignDashboard.classList.remove("hidden");
+    currentCampaignId = null;
+    isCurrentUserMaster = false;
+  });
+
+  window.abrirCampanha = (campaignId, isMaster) => {
+    currentCampaignId = campaignId;
+    isCurrentUserMaster = isMaster;
+    if (agentsView) agentsView.classList.remove("hidden");
+    if (campaignDashboard) campaignDashboard.classList.add("hidden");
+    renderizarListaAgentes();
+  };
+
+  window.deletarCampanha = async (campaignId) => {
+    if (
+      confirm(
+        "Tem a certeza que deseja apagar esta campanha? Todos os jogadores perderão o acesso.",
+      )
+    ) {
+      try {
+        await deleteDoc(doc(db, "campaigns", String(campaignId)));
+      } catch (error) {
+        console.error("Erro ao apagar campanha:", error);
+        alert("Erro ao apagar campanha. Verifique as permissões.");
+      }
+    }
+  };
+}
+
+// ==========================================
+// MÓDULO 2: LISTA DE AGENTES (DENTRO DA CAMPANHA)
 // ==========================================
 const listaDiv = document.getElementById("lista-personagens");
 const btnNovo = document.getElementById("btn-novo-personagem");
 const inputNovoNome = document.getElementById("input-novo-nome");
-const btnEntrarCirculo = document.getElementById("btn-entrar-circulo");
-const painelAgentes = document.getElementById("painel-agentes");
 
-if (listaDiv && btnNovo) {
-  if (btnEntrarCirculo && painelAgentes) {
-    btnEntrarCirculo.addEventListener("click", () => {
-      painelAgentes.classList.toggle("hidden");
-    });
-  }
+async function renderizarListaAgentes() {
+  if (!currentCampaignId || !listaDiv) return;
+  listaDiv.innerHTML = `<p style="color:#aaa; text-align:center;">A carregar agentes...</p>`;
 
-  function renderizarLista() {
-    const personagens = carregarBanco();
-    listaDiv.innerHTML = "";
+  try {
+    let q;
+    if (isCurrentUserMaster) {
+      // O mestre tem permissão para carregar as fichas de todos os jogadores da campanha
+      q = query(
+        collection(db, "agentes"),
+        where("campaignId", "==", currentCampaignId),
+      );
+    } else {
+      // O jogador tem permissão apenas para carregar as suas próprias fichas
+      q = query(
+        collection(db, "agentes"),
+        where("campaignId", "==", currentCampaignId),
+        where("userId", "==", currentUser.uid),
+      );
+    }
 
-    if (personagens.length === 0) {
-      listaDiv.innerHTML =
-        '<p style="color:#aaa; text-align:center; font-family:Georgia, serif; text-shadow: 1px 1px 2px #000;">Vazio. O círculo aguarda.</p>';
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      listaDiv.innerHTML = `<p style="color:#aaa; text-align:center;">Nenhum protocolo encontrado.</p>`;
       return;
     }
 
-    personagens.forEach((agente) => {
+    listaDiv.innerHTML = "";
+    querySnapshot.forEach((doc) => {
+      const agente = doc.data();
       const wrapper = document.createElement("div");
       wrapper.className = "agent-wrapper";
 
+      const isOwner = agente.userId === currentUser.uid;
+      const deleteButtonHtml = isOwner
+        ? `<button class="agent-delete-btn" onclick="deletarPersonagem('${agente.id}')">Remover</button>`
+        : "";
+
       wrapper.innerHTML = `
-                <button class="agent-center-btn" onclick="abrirFicha(${agente.id})">${agente.identidade.nome}</button>
-                <button class="agent-delete-btn" onclick="deletarPersonagem(${agente.id})">Remover</button>
-            `;
+          <button class="agent-center-btn" onclick="abrirFicha('${agente.id}')">${agente.identidade.nome}</button>
+          ${deleteButtonHtml}
+        `;
       listaDiv.appendChild(wrapper);
     });
+  } catch (error) {
+    console.error("Erro ao carregar lista de agentes:", error);
+    listaDiv.innerHTML = `<p style="color:red; text-align:center;">Erro de permissões ao carregar fichas.</p>`;
   }
+}
 
-  btnNovo.addEventListener("click", () => {
+if (listaDiv && btnNovo) {
+  btnNovo.addEventListener("click", async () => {
     const nome = inputNovoNome.value.trim();
-    if (!nome) {
-      alert("Por favor, digite um nome para o agente.");
-      return;
-    }
+    if (!nome) return alert("Por favor, digite um nome para o agente.");
 
-    const personagens = carregarBanco();
     const novoAgente = criarAgenteEmBranco(nome);
-    personagens.push(novoAgente);
-    salvarBanco(personagens);
+    await salvarAgenteNuvem(novoAgente);
     abrirFicha(novoAgente.id);
   });
 
-  window.abrirFicha = function (id) {
-    window.location.assign(`./ficha.html?id=${id}`);
-  };
-  window.deletarPersonagem = function (id) {
-    if (confirm("Excluir permanentemente este agente?")) {
-      let personagens = carregarBanco();
-      personagens = personagens.filter((p) => p.id !== id);
-      salvarBanco(personagens);
-      renderizarLista();
+  window.abrirFicha = (id) => window.location.assign(`./ficha.html?id=${id}`);
+
+  window.deletarPersonagem = async (id) => {
+    if (
+      confirm(
+        "Excluir permanentemente este agente? As regras não permitem recuperação.",
+      )
+    ) {
+      await deleteDoc(doc(db, "agentes", String(id)));
+      renderizarListaAgentes();
     }
   };
-
-  renderizarLista();
-
-  // Importação de Ficha via JSON (Página Index)
-  const inputImportar = document.getElementById("input-importar");
-  if (inputImportar) {
-    inputImportar.addEventListener("change", (evento) => {
-      const file = evento.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const dadosImportados = JSON.parse(e.target.result);
-          dadosImportados.id = Date.now(); // Garante que a ficha importada tenha um ID único
-          const personagens = carregarBanco();
-          personagens.push(normalizarAgente(dadosImportados));
-          salvarBanco(personagens);
-          renderizarLista();
-          alert("Ficha importada com sucesso!");
-        } catch (err) {
-          alert(
-            "Erro ao importar a ficha. Verifique se o arquivo JSON é válido.",
-          );
-        }
-        inputImportar.value = ""; // Limpa o input
-      };
-      reader.readAsText(file);
-    });
-  }
 }
 
 // ==========================================
@@ -290,56 +620,86 @@ if (formFicha) {
   const urlParams = new URLSearchParams(window.location.search);
   const agenteId = Number(urlParams.get("id")); // Number() lê IDs gigantes de Date.now() com mais precisão do que parseInt
   let agenteAtual = null;
+  let pendingUpdates = {};
+  let saveTimeoutFicha;
+
+  function atualizarCampoDebounced(categoria, chave, valor) {
+    pendingUpdates[`${categoria}.${chave}`] = valor;
+    clearTimeout(saveTimeoutFicha);
+    saveTimeoutFicha = setTimeout(async () => {
+      const updates = { ...pendingUpdates };
+      pendingUpdates = {}; // limpa para o próximo lote
+      try {
+        await updateDoc(doc(db, "agentes", String(agenteId)), updates);
+      } catch (e) {
+        console.error("Erro ao atualizar campo:", e);
+        alert(
+          "Falha ao salvar: Você não tem permissão para editar esta ficha ou o campo.",
+        );
+      }
+    }, 1000);
+  }
 
   function carregarFichaNaTela() {
-    const personagens = carregarBanco();
-    agenteAtual = personagens.find((p) => p.id === agenteId);
+    const docRef = doc(db, "agentes", String(agenteId));
 
-    if (!agenteAtual) {
-      window.location.assign("./index.html");
-      return;
-    }
+    // O "onSnapshot" mantém a ficha atualizada em tempo real se o mestre alterar algo!
+    onSnapshot(docRef, (docSnap) => {
+      if (!docSnap.exists()) {
+        window.location.assign("./index.html");
+        return;
+      }
 
-    agenteAtual = normalizarAgente(agenteAtual);
-    const index = personagens.findIndex((p) => p.id === agenteId);
-    if (index !== -1) {
-      personagens[index] = agenteAtual;
-      salvarBanco(personagens);
-    }
+      agenteAtual = normalizarAgente(docSnap.data());
+      const todosInputs = formFicha.querySelectorAll("input, textarea, select");
 
-    const todosInputs = formFicha.querySelectorAll("input, textarea, select");
+      todosInputs.forEach((campo) => {
+        if (campo.type === "file") return;
 
-    todosInputs.forEach((campo) => {
-      const partes = campo.id.split("-");
-      if (partes.length === 2) {
-        const categoria = partes[0];
-        const chave = partes[1];
+        // Se o utilizador atual estiver a escrever neste exato campo, não o interrompemos
+        if (campo === document.activeElement) return;
 
+        const partes = campo.id.split("-");
+        if (partes.length === 2) {
+          const categoria = partes[0];
+          const chave = partes[1];
+
+          if (
+            agenteAtual[categoria] &&
+            agenteAtual[categoria][chave] !== undefined
+          ) {
+            // Só atualizamos visualmente se for diferente, para evitar interrupções de navegação
+            if (campo.value != agenteAtual[categoria][chave]) {
+              campo.value = agenteAtual[categoria][chave];
+            }
+          }
+        }
+      });
+
+      // Atualizar a imagem da Marca em tempo real
+      if (agenteAtual.habilidades && agenteAtual.habilidades.marca_img) {
+        const marcaPreview = document.getElementById("marca-preview");
+        const marcaPlaceholder = document.getElementById("marca-placeholder");
         if (
-          agenteAtual[categoria] &&
-          agenteAtual[categoria][chave] !== undefined
+          marcaPreview &&
+          marcaPreview.src !== agenteAtual.habilidades.marca_img
         ) {
-          campo.value = agenteAtual[categoria][chave];
+          marcaPreview.src = agenteAtual.habilidades.marca_img;
+          marcaPreview.style.display = "block";
+          if (marcaPlaceholder) marcaPlaceholder.style.display = "none";
         }
       }
     });
-
-    // Carregar preview da Imagem da Marca, se existir
-    if (agenteAtual.habilidades && agenteAtual.habilidades.marca_img) {
-      const marcaPreview = document.getElementById("marca-preview");
-      const marcaPlaceholder = document.getElementById("marca-placeholder");
-      if (marcaPreview) {
-        marcaPreview.src = agenteAtual.habilidades.marca_img;
-        marcaPreview.style.display = "block";
-        if (marcaPlaceholder) marcaPlaceholder.style.display = "none";
-      }
-    }
   }
 
   formFicha.addEventListener("input", (evento) => {
     if (!agenteAtual) return;
 
     const elemento = evento.target;
+
+    // Impede de tentar salvar o caminho invisível da imagem. A foto já tem um script de save próprio
+    if (elemento.type === "file") return;
+
     const partes = elemento.id.split("-");
 
     if (partes.length === 2) {
@@ -355,12 +715,8 @@ if (formFicha) {
       if (!agenteAtual[categoria]) agenteAtual[categoria] = {};
       agenteAtual[categoria][chave] = valorTratado;
 
-      const personagens = carregarBanco();
-      const index = personagens.findIndex((p) => p.id === agenteId);
-      if (index !== -1) {
-        personagens[index] = agenteAtual;
-        salvarBanco(personagens);
-      }
+      // Envia APENAS o campo específico para a nuvem para não apagar edições de outros (ex: Mestre)
+      atualizarCampoDebounced(categoria, chave, valorTratado);
     }
   });
 
@@ -373,25 +729,73 @@ if (formFicha) {
       const file = evento.target.files[0];
       if (!file) return;
 
+      if (marcaPlaceholder) {
+        marcaPlaceholder.style.display = "block";
+        marcaPlaceholder.innerText = "Processando...";
+        marcaPreview.style.display = "none";
+      }
+
       const reader = new FileReader();
       reader.onload = (e) => {
-        const base64Img = e.target.result;
-        marcaPreview.src = base64Img;
-        marcaPreview.style.display = "block";
-        if (marcaPlaceholder) marcaPlaceholder.style.display = "none";
+        const img = new Image();
+        img.onload = () => {
+          // Redimensionar e comprimir
+          const MAX_WIDTH = 400;
+          const MAX_HEIGHT = 400;
+          let width = img.width;
+          let height = img.height;
 
-        if (!agenteAtual) return;
-        if (!agenteAtual.habilidades) agenteAtual.habilidades = {};
-        agenteAtual.habilidades.marca_img = base64Img;
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
 
-        const personagens = carregarBanco();
-        const index = personagens.findIndex((p) => p.id === agenteId);
-        if (index !== -1) {
-          personagens[index] = agenteAtual;
-          salvarBanco(personagens);
-        }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+
+          // Adiciona um fundo branco para evitar que imagens PNG transparentes fiquem com fundo preto no JPEG
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, width, height);
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Comprime para JPEG (formato universal) com qualidade de 70% para garantir tamanho mínimo
+          const base64Img = canvas.toDataURL("image/jpeg", 0.7);
+
+          marcaPreview.src = base64Img;
+          marcaPreview.style.display = "block";
+          if (marcaPlaceholder) {
+            marcaPlaceholder.style.display = "none";
+            marcaPlaceholder.innerText = "Clique aqui para anexar a Marca"; // Reseta o texto
+          }
+
+          if (!agenteAtual) return;
+          if (!agenteAtual.habilidades) agenteAtual.habilidades = {};
+          agenteAtual.habilidades.marca_img = base64Img;
+
+          // Salva APENAS a imagem para não haver conflito de versão com textos
+          updateDoc(doc(db, "agentes", String(agenteId)), {
+            "habilidades.marca_img": base64Img,
+          }).catch((e) => {
+            console.error("Erro ao salvar marca:", e);
+            alert(
+              "Falha ao salvar a imagem da Marca: Você não tem permissão para editar esta ficha.",
+            );
+          });
+        };
+        img.src = e.target.result;
       };
       reader.readAsDataURL(file); // Lê a imagem e converte para texto Base64 compatível com LocalStorage
+      evento.target.value = ""; // Limpa o input para permitir selecionar a mesma imagem novamente se necessário
     });
   }
 
@@ -415,19 +819,14 @@ if (formFicha) {
       const file = evento.target.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const dadosImportados = JSON.parse(e.target.result);
           dadosImportados.id = agenteId; // Mantém o ID atual para sobrescrever a ficha sendo editada
 
-          const personagens = carregarBanco();
-          const index = personagens.findIndex((p) => p.id === agenteId);
-          if (index !== -1) {
-            personagens[index] = normalizarAgente(dadosImportados);
-            salvarBanco(personagens);
-            alert("Ficha importada e atualizada com sucesso!");
-            location.reload(); // Recarrega para aplicar os novos dados na tela
-          }
+          await salvarAgenteNuvem(normalizarAgente(dadosImportados));
+          alert("Ficha importada e atualizada com sucesso!");
+          location.reload(); // Recarrega para aplicar os novos dados na tela
         } catch (err) {
           alert(
             "Erro ao importar a ficha. Verifique se o arquivo JSON é válido.",
@@ -439,5 +838,24 @@ if (formFicha) {
     });
   }
 
-  carregarFichaNaTela();
+  // Força o salvamento imediato e volta para o menu principal
+  window.voltarParaMenu = async function () {
+    if (Object.keys(pendingUpdates).length > 0) {
+      clearTimeout(saveTimeoutFicha);
+      const updates = { ...pendingUpdates };
+      pendingUpdates = {};
+      await updateDoc(doc(db, "agentes", String(agenteId)), updates);
+    }
+    window.location.assign("./index.html");
+  };
+
+  // Apenas carrega a ficha após confirmar que o usuário está autenticado
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      currentUser = user;
+      carregarFichaNaTela();
+    } else {
+      window.location.assign("./index.html");
+    }
+  });
 }
