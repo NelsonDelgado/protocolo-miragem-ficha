@@ -72,6 +72,11 @@ body {
   z-index: 10;
 }
 
+#agents-view.b1 {
+  max-width: 900px;
+  width: 95%;
+}
+
 /* Painel de registo com estética sombria */
 .new-agent-panel-dark {
   background: rgba(0, 0, 0, 0.85);
@@ -160,4 +165,99 @@ body {
 }
 .agent-delete-btn:hover {
   background: #f00;
+}
+
+/* Grelha de Personagens da Campanha */
+.agents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  width: 100%;
+  align-items: stretch;
+}
+
+.agent-card {
+  display: flex;
+  background: #181818;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  border: 1px solid #333;
+}
+
+.agent-card-left {
+  width: 120px;
+  background: #252525;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.agent-card-left img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.agent-card-right {
+  flex: 1;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.agent-card-name {
+  font-size: 18px;
+  font-weight: bold;
+  margin: 0 0 5px 0;
+  color: #fff;
+}
+
+.agent-card-role {
+  font-size: 13px;
+  color: #ccc;
+  margin: 0 0 5px 0;
+}
+
+.agent-card-date {
+  font-size: 11px;
+  color: #777;
+  margin: 0 0 10px 0;
+}
+
+.agent-card-btn {
+  align-self: flex-start;
+  background: #8a2be2;
+  color: #fff;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 11px;
+  text-transform: uppercase;
+  transition: background 0.2s;
+}
+
+.agent-card-btn:hover {
+  background: #9b30ff;
+}
+
+.agent-card-settings {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 16px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  line-height: 1;
+}
+
+.agent-card-settings:hover {
+  color: #aaa;
 }

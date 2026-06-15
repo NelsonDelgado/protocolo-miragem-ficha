@@ -136,11 +136,23 @@ function criarAgenteEmBranco(nomeInicial) {
       dirigir: 0,
       dirigir_base: 0,
       dirigir_espec: "",
+      dirigir2: 0,
+      dirigir2_base: 0,
+      dirigir2_espec: "",
+      dirigir3: 0,
+      dirigir3_base: 0,
+      dirigir3_espec: "",
       atualidades: 20,
       atualidades_base: 20,
       ciencia: 0,
       ciencia_base: 0,
       ciencia_espec: "",
+      ciencia2: 0,
+      ciencia2_base: 0,
+      ciencia2_espec: "",
+      ciencia3: 0,
+      ciencia3_base: 0,
+      ciencia3_espec: "",
       computador: 15,
       computador_base: 15,
       credito: 0,
@@ -195,7 +207,13 @@ function criarAgenteEmBranco(nomeInicial) {
       vontade: 25,
       vontade_base: 25,
     },
-    perfil: { aparencia: "", personalidade: "", traumas: "", notas: "" },
+    perfil: {
+      aparencia: "",
+      foto_img: "",
+      personalidade: "",
+      traumas: "",
+      notas: "",
+    },
     recursos: {
       patente: "",
       categoria: "",
@@ -541,43 +559,53 @@ async function renderizarListaAgentes() {
   listaDiv.innerHTML = `<p style="color:#aaa; text-align:center;">A carregar agentes...</p>`;
 
   try {
-    let q;
-    if (isCurrentUserMaster) {
-      // O mestre tem permissão para carregar as fichas de todos os jogadores da campanha
-      q = query(
-        collection(db, "agentes"),
-        where("campaignId", "==", currentCampaignId),
-      );
-    } else {
-      // O jogador tem permissão apenas para carregar as suas próprias fichas
-      q = query(
-        collection(db, "agentes"),
-        where("campaignId", "==", currentCampaignId),
-        where("userId", "==", currentUser.uid),
-      );
-    }
+    const q = query(
+      collection(db, "agentes"),
+      where("campaignId", "==", currentCampaignId),
+    );
 
     const querySnapshot = await getDocs(q);
 
+    listaDiv.className = "agents-grid";
+    listaDiv.innerHTML = "";
+
     if (querySnapshot.empty) {
-      listaDiv.innerHTML = `<p style="color:#aaa; text-align:center;">Nenhum protocolo encontrado.</p>`;
+      listaDiv.innerHTML = `<p style="color:#aaa; text-align:center;">Nenhum agente registrado nesta campanha.</p>`;
       return;
     }
 
-    listaDiv.innerHTML = "";
-    querySnapshot.forEach((doc) => {
-      const agente = doc.data();
+    querySnapshot.forEach((docSnap) => {
+      const agente = docSnap.data();
       const wrapper = document.createElement("div");
-      wrapper.className = "agent-wrapper";
+      wrapper.className = "agent-card";
 
       const isOwner = agente.userId === currentUser.uid;
-      const deleteButtonHtml = isOwner
-        ? `<button class="agent-delete-btn" onclick="deletarPersonagem('${agente.id}')">Remover</button>`
+      const canEdit = isOwner || isCurrentUserMaster;
+
+      const fotoHtml =
+        agente.perfil && agente.perfil.foto_img
+          ? `<img src="${agente.perfil.foto_img}" alt="Foto de ${agente.identidade.nome}">`
+          : `<div style="color: #666; font-size: 11px; text-transform: uppercase; text-align: center; padding: 10px;">Sem Foto</div>`;
+
+      const deleteButtonHtml = canEdit
+        ? `<button class="agent-card-settings" onclick="deletarPersonagem('${agente.id}')" title="Apagar Agente">⚙️</button>`
         : "";
 
+      const acessarButtonHtml = canEdit
+        ? `<button class="agent-card-btn" onclick="abrirFicha('${agente.id}', true)">Acessar Ficha</button>`
+        : `<button class="agent-card-btn" style="background: #444; color: #888; cursor: not-allowed;" disabled title="Acesso Restrito">Ficha Privada</button>`;
+
+      const dataReg = new Date(agente.id).toLocaleDateString("pt-BR");
+
       wrapper.innerHTML = `
-          <button class="agent-center-btn" onclick="abrirFicha('${agente.id}')">${agente.identidade.nome}</button>
-          ${deleteButtonHtml}
+          <div class="agent-card-left">${fotoHtml}</div>
+          <div class="agent-card-right">
+            ${deleteButtonHtml}
+            <h4 class="agent-card-name">${agente.identidade.nome || "Desconhecido"}</h4>
+            <p class="agent-card-role">${agente.identidade.ocupacao || "Sem Ocupação"}</p>
+            <p class="agent-card-date">Registrado em ${dataReg}</p>
+            ${acessarButtonHtml}
+          </div>
         `;
       listaDiv.appendChild(wrapper);
     });
@@ -597,7 +625,8 @@ if (listaDiv && btnNovo) {
     abrirFicha(novoAgente.id);
   });
 
-  window.abrirFicha = (id) => window.location.assign(`./ficha.html?id=${id}`);
+  window.abrirFicha = (id, canEdit = true) =>
+    window.location.assign(`./ficha.html?id=${id}&readonly=${!canEdit}`);
 
   window.deletarPersonagem = async (id) => {
     if (
@@ -612,13 +641,14 @@ if (listaDiv && btnNovo) {
 }
 
 // ==========================================
-// MÓDULO 2: PÁGINA DA FICHA (EDIÇÃO)
+// MÓDULO 3: PÁGINA DA FICHA (EDIÇÃO)
 // ==========================================
 const formFicha = document.getElementById("form-ficha");
 
 if (formFicha) {
   const urlParams = new URLSearchParams(window.location.search);
   const agenteId = Number(urlParams.get("id")); // Number() lê IDs gigantes de Date.now() com mais precisão do que parseInt
+  const isReadOnly = urlParams.get("readonly") === "true";
   let agenteAtual = null;
   let pendingUpdates = {};
   let saveTimeoutFicha;
@@ -644,16 +674,48 @@ if (formFicha) {
     const docRef = doc(db, "agentes", String(agenteId));
 
     // O "onSnapshot" mantém a ficha atualizada em tempo real se o mestre alterar algo!
-    onSnapshot(docRef, (docSnap) => {
+    onSnapshot(docRef, async (docSnap) => {
       if (!docSnap.exists()) {
         window.location.assign("./index.html");
         return;
       }
 
-      agenteAtual = normalizarAgente(docSnap.data());
+      const data = docSnap.data();
+
+      // Verificação de Privacidade (Apenas dono ou mestre podem abrir a ficha)
+      const isOwner = data.userId === currentUser.uid;
+      let isMaster = false;
+
+      if (data.campaignId) {
+        try {
+          const campSnap = await getDoc(doc(db, "campaigns", data.campaignId));
+          if (
+            campSnap.exists() &&
+            campSnap.data().masterId === currentUser.uid
+          ) {
+            isMaster = true;
+          }
+        } catch (e) {
+          console.error("Erro ao verificar status de mestre:", e);
+        }
+      }
+
+      if (!isOwner && !isMaster) {
+        alert(
+          "Acesso Negado: Esta ficha é privada. Apenas o jogador que a criou ou o Mestre podem acessá-la.",
+        );
+        window.location.assign("./index.html");
+        return;
+      }
+
+      agenteAtual = normalizarAgente(data);
       const todosInputs = formFicha.querySelectorAll("input, textarea, select");
 
       todosInputs.forEach((campo) => {
+        if (isReadOnly) {
+          campo.disabled = true; // Bloqueia todos os inputs, checkboxes, textareas
+        }
+
         if (campo.type === "file") return;
 
         // Se o utilizador atual estiver a escrever neste exato campo, não o interrompemos
@@ -664,12 +726,16 @@ if (formFicha) {
           const categoria = partes[0];
           const chave = partes[1];
 
-          if (
-            agenteAtual[categoria] &&
-            agenteAtual[categoria][chave] !== undefined
-          ) {
-            // Só atualizamos visualmente se for diferente, para evitar interrupções de navegação
-            if (campo.value != agenteAtual[categoria][chave]) {
+          if (agenteAtual[categoria]) {
+            if (campo.type === "checkbox") {
+              const valorBooleano = !!agenteAtual[categoria][chave];
+              if (campo.checked !== valorBooleano) {
+                campo.checked = valorBooleano;
+              }
+            } else if (
+              agenteAtual[categoria][chave] !== undefined &&
+              campo.value != agenteAtual[categoria][chave]
+            ) {
               campo.value = agenteAtual[categoria][chave];
             }
           }
@@ -689,10 +755,30 @@ if (formFicha) {
           if (marcaPlaceholder) marcaPlaceholder.style.display = "none";
         }
       }
+
+      // Atualizar a imagem da Foto em tempo real
+      if (agenteAtual.perfil && agenteAtual.perfil.foto_img) {
+        const fotoPreview = document.getElementById("foto-preview");
+        const fotoPlaceholder = document.getElementById("foto-placeholder");
+        if (fotoPreview && fotoPreview.src !== agenteAtual.perfil.foto_img) {
+          fotoPreview.src = agenteAtual.perfil.foto_img;
+          fotoPreview.style.display = "block";
+          if (fotoPlaceholder) fotoPlaceholder.style.display = "none";
+        }
+      }
+
+      if (isReadOnly) {
+        // Desativa a capacidade de clicar na área da imagem para fazer upload
+        const fotoContainer = document.getElementById("foto-container");
+        if (fotoContainer) fotoContainer.onclick = null;
+        const marcaContainer = document.getElementById("marca-container");
+        if (marcaContainer) marcaContainer.onclick = null;
+      }
     });
   }
 
   formFicha.addEventListener("input", (evento) => {
+    if (isReadOnly) return; // Impede gravação se tentar contornar HTML
     if (!agenteAtual) return;
 
     const elemento = evento.target;
@@ -710,7 +796,11 @@ if (formFicha) {
       if (chave.includes("_base")) return;
 
       const valorTratado =
-        elemento.type === "number" ? Number(elemento.value) : elemento.value;
+        elemento.type === "number"
+          ? Number(elemento.value)
+          : elemento.type === "checkbox"
+            ? elemento.checked
+            : elemento.value;
 
       if (!agenteAtual[categoria]) agenteAtual[categoria] = {};
       agenteAtual[categoria][chave] = valorTratado;
@@ -719,6 +809,82 @@ if (formFicha) {
       atualizarCampoDebounced(categoria, chave, valorTratado);
     }
   });
+
+  // Upload de Imagem na Seção da Foto
+  const fotoUpload = document.getElementById("foto-upload");
+  const fotoPreview = document.getElementById("foto-preview");
+  const fotoPlaceholder = document.getElementById("foto-placeholder");
+  if (fotoUpload && fotoPreview) {
+    fotoUpload.addEventListener("change", (evento) => {
+      const file = evento.target.files[0];
+      if (!file) return;
+
+      if (fotoPlaceholder) {
+        fotoPlaceholder.style.display = "block";
+        fotoPlaceholder.innerText = "Processando...";
+        fotoPreview.style.display = "none";
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // Redimensionar e comprimir
+          const MAX_WIDTH = 400;
+          const MAX_HEIGHT = 400;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, width, height);
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const base64Img = canvas.toDataURL("image/jpeg", 0.7);
+
+          fotoPreview.src = base64Img;
+          fotoPreview.style.display = "block";
+          if (fotoPlaceholder) {
+            fotoPlaceholder.style.display = "none";
+            fotoPlaceholder.innerText = "Clique aqui para anexar a Foto";
+          }
+
+          if (!agenteAtual) return;
+          if (!agenteAtual.perfil) agenteAtual.perfil = {};
+          agenteAtual.perfil.foto_img = base64Img;
+
+          updateDoc(doc(db, "agentes", String(agenteId)), {
+            "perfil.foto_img": base64Img,
+          }).catch((e) => {
+            console.error("Erro ao salvar foto:", e);
+            alert(
+              "Falha ao salvar a imagem da Foto: Você não tem permissão para editar esta ficha.",
+            );
+          });
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+      evento.target.value = "";
+    });
+  }
 
   // Upload de Imagem na Seção da Marca
   const marcaUpload = document.getElementById("marca-upload");

@@ -120,8 +120,7 @@ select:focus {
 }
 
 .dashboard-main,
-.new-agent-panel,
-.sheet-page {
+.new-agent-panel {
   background:
     linear-gradient(rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.88)),
     radial-gradient(
@@ -213,6 +212,7 @@ select:focus {
 
 .sheet-page {
   position: relative;
+  background: url("fundo.png") center/cover no-repeat;
   min-height: 1040px;
   border: 4px solid var(--ink);
   outline: 1px solid var(--ink);
@@ -292,9 +292,9 @@ select:focus {
 
 .attribute-web {
   position: relative;
-  width: min(650px, 80vw);
+  width: min(860px, 95vw);
   aspect-ratio: 1;
-  background-image: url("image copy.png");
+  background-image: url("heptagrama_de_atributos.png");
   background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
@@ -323,11 +323,11 @@ select:focus {
 
 .attribute-node input,
 .attribute-core input {
-  width: 56px;
-  min-height: 38px;
+  width: 68px;
+  min-height: 46px;
   margin: 0;
   text-align: center;
-  font-size: 24px;
+  font-size: 30px;
   font-weight: 900;
   background: rgba(255, 255, 255, 0.85);
   border: 2px solid var(--ink);
@@ -336,37 +336,37 @@ select:focus {
 
 .attr-carisma {
   left: 50%;
-  top: 12%;
+  top: 16%;
   transform: translate(-50%, -50%);
 }
 .attr-sabedoria {
-  left: 79.6%;
-  top: 26.5%;
+  left: 77%;
+  top: 29%;
   transform: translate(-50%, -50%);
 }
 .attr-agilidade {
-  left: 86.8%;
-  top: 58.3%;
+  left: 83.5%;
+  top: 58%;
   transform: translate(-50%, -50%);
 }
 .attr-corpo {
-  left: 66.3%;
-  top: 84.2%;
+  left: 65%;
+  top: 81%;
   transform: translate(-50%, -50%);
 }
 .attr-vigor {
-  left: 33.7%;
-  top: 84.2%;
+  left: 35%;
+  top: 81%;
   transform: translate(-50%, -50%);
 }
 .attr-inteligencia {
-  left: 13.2%;
-  top: 58.3%;
+  left: 16.5%;
+  top: 58%;
   transform: translate(-50%, -50%);
 }
 .attr-forca {
-  left: 20.4%;
-  top: 26.5%;
+  left: 23%;
+  top: 29%;
   transform: translate(-50%, -50%);
 }
 .attribute-core {
@@ -603,12 +603,18 @@ select:focus {
   font-size: 13px;
 }
 
-.linha-pericia::before {
-  content: "";
+.checkbox-pericia {
+  appearance: none;
+  -webkit-appearance: none;
   width: 20px;
   height: 20px;
+  min-height: 20px;
   border: 2px solid var(--line);
   background: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+  outline: none;
 }
 
 .linha-pericia.especial {
@@ -617,12 +623,11 @@ select:focus {
     30px 32px 8px 32px 34px 8px;
 }
 
-.linha-pericia.especial::before {
+.checkbox-pericia:checked {
   box-shadow:
     inset 0 0 0 5px #fff,
     inset 0 0 0 9px var(--ink);
 }
-
 .label-pericia {
   font-weight: 700;
   line-height: 1.1;
@@ -1023,7 +1028,7 @@ select:focus {
     grid-template-columns: 1fr;
   }
 
-  .linha-pericia::before {
+  .checkbox-pericia {
     display: none;
   }
 
