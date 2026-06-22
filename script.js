@@ -278,48 +278,8 @@ const btnLogout = document.getElementById("btn-logout");
 const userEmailEl = document.getElementById("user-email");
 
 async function migrarDadosAntigosParaFirebase() {
-  const CHAVE_BANCO = "protocoloMiragemAgentes";
-  const dadosLocais = localStorage.getItem(CHAVE_BANCO);
-  if (!dadosLocais) return; // Se não houver dados antigos, não faz nada
-
-  try {
-    const personagensAntigos = JSON.parse(dadosLocais);
-    if (Array.isArray(personagensAntigos) && personagensAntigos.length > 0) {
-      alert(
-        "Detetámos fichas antigas no seu dispositivo! A migrá-las para a sua conta na nuvem...",
-      );
-
-      // Cria uma campanha especial para guardar as fichas velhas
-      const campaignId = Math.random()
-        .toString(36)
-        .substring(2, 8)
-        .toUpperCase();
-      await setDoc(doc(db, "campaigns", campaignId), {
-        name: "Arquivo Local (Fichas Antigas)",
-        masterId: currentUser.uid,
-        playerIds: [],
-      });
-
-      // Envia as fichas uma a uma para essa campanha
-      for (const p of personagensAntigos) {
-        const agenteMigrado = normalizarAgente(p);
-        agenteMigrado.userId = currentUser.uid;
-        agenteMigrado.campaignId = campaignId;
-        await setDoc(
-          doc(db, "agentes", String(agenteMigrado.id)),
-          agenteMigrado,
-        );
-      }
-
-      // Limpa a cache antiga para este código não voltar a rodar no futuro
-      localStorage.removeItem(CHAVE_BANCO);
-      alert(
-        "Migração concluída com sucesso! As suas fichas antigas estão na campanha 'Arquivo Local'.",
-      );
-    }
-  } catch (e) {
-    console.error("Erro na migração:", e);
-  }
+  // Desativado para evitar o uso de localStorage
+  return;
 }
 
 if (loginView) {
@@ -1622,7 +1582,6 @@ if (formFicha) {
     }
   };
 
-=======
   // Lógica de Modo Escuro
   const btnDarkMode = document.getElementById("btn-dark-mode");
   
@@ -1636,26 +1595,17 @@ if (formFicha) {
     }
   }
 
-  // Verificar preferência anterior
-  const temaSalvo = localStorage.getItem("theme");
-  if (temaSalvo) {
-    aplicarTema(temaSalvo);
-  } else {
-    // Verificar preferência do sistema
-    const prefEscuro = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    aplicarTema(prefEscuro ? "dark" : "light");
-  }
+  // Verificar preferência do sistema
+  const prefEscuro = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  aplicarTema(prefEscuro ? "dark" : "light");
 
   if (btnDarkMode) {
     btnDarkMode.addEventListener("click", () => {
       const eEscuro = document.body.classList.contains("dark-theme");
       const novoTema = eEscuro ? "light" : "dark";
       aplicarTema(novoTema);
-      localStorage.setItem("theme", novoTema);
     });
   }
-
->>>>>>> Features-novas
   function atualizarCampoDebounced(categoria, chave, valor) {
     pendingUpdates[`${categoria}.${chave}`] = valor;
     clearTimeout(saveTimeoutFicha);
