@@ -992,11 +992,15 @@ if (formFicha) {
       }
 
       agenteAtual = normalizarAgente(data);
-      const todosInputs = formFicha.querySelectorAll("input, textarea, select");
+      const todosInputs = formFicha.querySelectorAll("input, textarea, select, div.editor-editable");
 
       todosInputs.forEach((campo) => {
         if (isReadOnly) {
-          campo.disabled = true; // Bloqueia todos os inputs, checkboxes, textareas
+          if (campo.tagName === "DIV") {
+            campo.contentEditable = "false";
+          } else {
+            campo.disabled = true; // Bloqueia todos os inputs, checkboxes, textareas
+          }
         }
 
         if (campo.type === "file") return;
@@ -1014,6 +1018,11 @@ if (formFicha) {
               const valorBooleano = !!agenteAtual[categoria][chave];
               if (campo.checked !== valorBooleano) {
                 campo.checked = valorBooleano;
+              }
+            } else if (campo.tagName === "DIV") {
+              const valorDiv = agenteAtual[categoria][chave] || "";
+              if (campo.innerHTML !== valorDiv) {
+                campo.innerHTML = valorDiv;
               }
             } else if (
               agenteAtual[categoria][chave] !== undefined &&
@@ -1079,11 +1088,13 @@ if (formFicha) {
       if (chave.includes("_base")) return;
 
       const valorTratado =
-        elemento.type === "number"
-          ? Number(elemento.value)
-          : elemento.type === "checkbox"
-            ? elemento.checked
-            : elemento.value;
+        elemento.tagName === "DIV"
+          ? elemento.innerHTML
+          : elemento.type === "number"
+            ? Number(elemento.value)
+            : elemento.type === "checkbox"
+              ? elemento.checked
+              : elemento.value;
 
       if (!agenteAtual[categoria]) agenteAtual[categoria] = {};
       agenteAtual[categoria][chave] = valorTratado;
@@ -1303,6 +1314,102 @@ if (formFicha) {
     }
     window.location.assign("./index.html");
   };
+
+  // ==========================================
+  // SISTEMA DE DESTAQUE (HIGHLIGHT) FLUTUANTE
+  // ==========================================
+  const floatingBtn = document.createElement("button");
+  floatingBtn.type = "button";
+  floatingBtn.id = "floating-highlight-btn";
+  floatingBtn.innerHTML = "✏️ Destacar";
+  floatingBtn.style.position = "fixed";
+  floatingBtn.style.display = "none";
+  floatingBtn.style.zIndex = "10000";
+  floatingBtn.style.background = "#f7e03b";
+  floatingBtn.style.color = "#000";
+  floatingBtn.style.border = "1px solid #151515";
+  floatingBtn.style.borderRadius = "4px";
+  floatingBtn.style.padding = "4px 8px";
+  floatingBtn.style.fontSize = "12px";
+  floatingBtn.style.fontWeight = "bold";
+  floatingBtn.style.cursor = "pointer";
+  floatingBtn.style.boxShadow = "0 2px 5px rgba(0,0,0,0.3)";
+  document.body.appendChild(floatingBtn);
+
+  // Monitora alterações de seleção no documento
+  document.addEventListener("selectionchange", () => {
+    if (isReadOnly) return;
+    const selection = window.getSelection();
+    if (!selection.rangeCount || selection.isCollapsed) {
+      floatingBtn.style.display = "none";
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    let node = range.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) {
+      node = node.parentNode;
+    }
+    const editor = node.closest("div.editor-editable");
+
+    if (editor && editor.getAttribute("contenteditable") === "true") {
+      const rect = range.getBoundingClientRect();
+      // Posiciona acima do texto selecionado
+      floatingBtn.style.left = `${rect.left + rect.width / 2 - floatingBtn.offsetWidth / 2}px`;
+      floatingBtn.style.top = `${rect.top - 30}px`;
+      floatingBtn.style.display = "block";
+      
+      // Ajusta o alinhamento caso a largura ainda seja zero no primeiro render
+      setTimeout(() => {
+        floatingBtn.style.left = `${rect.left + rect.width / 2 - floatingBtn.offsetWidth / 2}px`;
+      }, 0);
+    } else {
+      floatingBtn.style.display = "none";
+    }
+  });
+
+  // Evento mousedown evita a perda da seleção no editor
+  floatingBtn.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Aplica a cor de fundo amarela de destaque
+    document.execCommand("backColor", false, "#f7e03b");
+
+    // Encontra o editor ativo para disparar o evento input e salvar no banco de dados
+    const selection = window.getSelection();
+    if (selection.rangeCount) {
+      let node = selection.getRangeAt(0).commonAncestorContainer;
+      if (node.nodeType === Node.TEXT_NODE) {
+        node = node.parentNode;
+      }
+      const editor = node.closest("div.editor-editable");
+      if (editor) {
+        editor.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    }
+    
+    // Oculta o botão e limpa a seleção
+    floatingBtn.style.display = "none";
+    window.getSelection().removeAllRanges();
+  });
+
+  // Atalho de teclado: Ctrl + H para destacar
+  document.addEventListener("keydown", (e) => {
+    if (isReadOnly) return;
+    if (e.ctrlKey && e.key.toLowerCase() === "h") {
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        activeEl.classList.contains("editor-editable") &&
+        activeEl.getAttribute("contenteditable") === "true"
+      ) {
+        e.preventDefault();
+        document.execCommand("backColor", false, "#f7e03b");
+        activeEl.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    }
+  });
 
   // Apenas carrega a ficha após confirmar que o usuário está autenticado
   onAuthStateChanged(auth, (user) => {

@@ -1171,3 +1171,48 @@ body.dark-theme .attribute-web {
 body.dark-theme .axis {
   background: #3a3a3a;
 }
+
+/* ==========================================
+   EDITABLE DIVS & HIGHLIGHTING (PM SYSTEM)
+   ========================================== */
+.editor-editable {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--ink);
+  outline: none;
+  overflow-y: auto;
+  word-wrap: break-word;
+  white-space: pre-wrap; /* Preserva quebras de linha e espaços */
+  padding: 8px;
+  line-height: 1.35;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: inherit;
+}
+
+body.dark-theme .editor-editable {
+  background: rgba(30, 30, 30, 0.88);
+  color: var(--ink);
+}
+
+.boxed-area .editor-editable {
+  border: 3px solid var(--line);
+  background: rgba(255, 255, 255, 0.48);
+  height: 100%;
+}
+
+body.dark-theme .boxed-area .editor-editable {
+  background: rgba(30, 30, 30, 0.58);
+}
+
+.personality-box .editor-editable { min-height: 180px; }
+.trauma-box .editor-editable { min-height: 150px; }
+.equipment-box .editor-editable { min-height: 220px; }
+.goods-box .editor-editable { min-height: 220px; }
+.attacks-box .editor-editable { min-height: 220px; }
+.abilities-box .editor-editable { min-height: 420px; }
+.corruption-box .editor-editable { min-height: 260px; }
+.rituals-box .editor-editable { min-height: 260px; }
+.notes-box .editor-editable { min-height: 290px; }
