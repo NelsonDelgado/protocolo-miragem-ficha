@@ -1450,7 +1450,7 @@
             </div>
             <div class="boxed-area personality-box">
               <span>PERSONALIDADE E OBJETIVOS</span>
-              <div id="perfil-personalidade" contenteditable="true" class="editor-editable"></div>
+              <textarea id="perfil-personalidade" rows="8"></textarea>
             </div>
             <div class="boxed-area trauma-box">
               <span>PAINEL CLÍNICO (FOBIAS & FERIMENTOS)</span>
@@ -1487,14 +1487,14 @@
               <span>SALÁRIO:</span>
               <input type="text" id="recursos-salario" />
             </label>
-            <label class="boxed-area equipment-box">
+            <div class="boxed-area equipment-box">
               <span>EQUIPAMENTOS</span>
               <textarea id="inventario-equipamentos" rows="10"></textarea>
-            </label>
-            <label class="boxed-area goods-box">
+            </div>
+            <div class="boxed-area goods-box">
               <span>BENS MATERIAIS</span>
               <textarea id="recursos-bens_materiais" rows="10"></textarea>
-            </label>
+            </div>
             <div class="load-matrix">
               <label
                 ><span>CARGA LEVE:</span
@@ -1523,11 +1523,11 @@
         <section class="sheet-page page-four">
           <div class="boxed-area attacks-box">
             <span>DESCRIÇÃO DOS EQUIPAMENTOS E ATAQUES:</span>
-            <div id="inventario-descricao" contenteditable="true" class="editor-editable"></div>
+            <textarea id="inventario-descricao" rows="10"></textarea>
           </div>
 
           <div class="combat-strip">
-            <label><span>RD:</span><div id="combate-rd" contenteditable="true" class="editor-editable" style="border:0; background:transparent; height:100%; width:100%;"></div></label>
+            <label><span>RD:</span><input type="text" id="combate-rd" /></label>
             <label
               ><span>DEFESA:</span><input type="text" id="combate-defesa"
             /></label>
@@ -1545,7 +1545,7 @@
             </div>
             <div class="boxed-area corruption-box">
               <span>TRANSFORMAÇÕES POR CORRUPÇÃO</span>
-              <div id="habilidades-transformacoes" contenteditable="true" class="editor-editable"></div>
+              <textarea id="habilidades-transformacoes" rows="10"></textarea>
             </div>
             <div class="boxed-area mark-box">
               <span>MARCA</span>
@@ -1611,7 +1611,7 @@
         <section class="sheet-page page-five">
           <div class="boxed-area notes-box">
             <span>NOTAS</span>
-            <div id="perfil-notas" contenteditable="true" class="editor-editable"></div>
+            <textarea id="perfil-notas" rows="12"></textarea>
           </div>
 
           <footer class="sheet-footer">
