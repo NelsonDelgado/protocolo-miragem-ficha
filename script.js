@@ -910,10 +910,10 @@ if (formFicha) {
   function aplicarTema(tema) {
     if (tema === "dark") {
       document.body.classList.add("dark-theme");
-      if (btnDarkMode) btnDarkMode.innerHTML = "Modo Claro ☀️";
+      if (btnDarkMode) btnDarkMode.innerHTML = "☀️";
     } else {
       document.body.classList.remove("dark-theme");
-      if (btnDarkMode) btnDarkMode.innerHTML = "Modo Escuro 🌙";
+      if (btnDarkMode) btnDarkMode.innerHTML = "🌙";
     }
   }
 
