@@ -7,6 +7,13 @@
     <link rel="stylesheet" href="style.css?v=6" />
   </head>
   <body class="ficha-body">
+    <!-- Botão Flutuante de Modo Escuro -->
+    <div style="position: fixed; top: 20px; right: 20px; z-index: 9999;">
+      <button type="button" id="btn-dark-mode" class="btn btn-secondary" style="border-radius: 50px; padding: 10px 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.15); font-weight: bold; cursor: pointer; border: 2px solid var(--line);">
+        Modo Escuro 🌙
+      </button>
+    </div>
+
     <main class="sheet-wrap" style="margin-top: 40px">
       <form id="form-ficha" onsubmit="return false;">
         <section class="sheet-page page-one">

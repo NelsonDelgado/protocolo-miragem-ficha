@@ -904,6 +904,38 @@ if (formFicha) {
   let pendingUpdates = {};
   let saveTimeoutFicha;
 
+  // Lógica de Modo Escuro
+  const btnDarkMode = document.getElementById("btn-dark-mode");
+  
+  function aplicarTema(tema) {
+    if (tema === "dark") {
+      document.body.classList.add("dark-theme");
+      if (btnDarkMode) btnDarkMode.innerHTML = "Modo Claro ☀️";
+    } else {
+      document.body.classList.remove("dark-theme");
+      if (btnDarkMode) btnDarkMode.innerHTML = "Modo Escuro 🌙";
+    }
+  }
+
+  // Verificar preferência anterior
+  const temaSalvo = localStorage.getItem("theme");
+  if (temaSalvo) {
+    aplicarTema(temaSalvo);
+  } else {
+    // Verificar preferência do sistema
+    const prefEscuro = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    aplicarTema(prefEscuro ? "dark" : "light");
+  }
+
+  if (btnDarkMode) {
+    btnDarkMode.addEventListener("click", () => {
+      const eEscuro = document.body.classList.contains("dark-theme");
+      const novoTema = eEscuro ? "light" : "dark";
+      aplicarTema(novoTema);
+      localStorage.setItem("theme", novoTema);
+    });
+  }
+
   function atualizarCampoDebounced(categoria, chave, valor) {
     pendingUpdates[`${categoria}.${chave}`] = valor;
     clearTimeout(saveTimeoutFicha);
