@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ficha do Agente - Protocolo Miragem</title>
-    <link rel="stylesheet" href="style.css?v=6" />
+    <link rel="stylesheet" href="style.css?v=7" />
   </head>
   <body class="ficha-body">
     <main class="sheet-wrap" style="margin-top: 40px">
@@ -1445,10 +1445,16 @@
               <span>PERSONALIDADE E OBJETIVOS</span>
               <textarea id="perfil-personalidade" rows="8"></textarea>
             </label>
-            <label class="boxed-area trauma-box">
-              <span>TRAUMAS / CICATRIZES / MALDIÇÕES</span>
-              <textarea id="perfil-traumas" rows="7"></textarea>
-            </label>
+            <div class="boxed-area trauma-box">
+              <span>PAINEL CLÍNICO (FOBIAS & FERIMENTOS)</span>
+              <div id="traumas-clinicos-container" class="interactive-container"></div>
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                <button type="button" id="btn-add-fobia" class="interactive-add-btn" style="margin-top:0;">+ Fobia/Mania</button>
+                <button type="button" id="btn-roll-fobia" class="interactive-add-btn" style="margin-top:0;">🎲 Rolar Fobia</button>
+                <button type="button" id="btn-add-ferimento" class="interactive-add-btn" style="margin-top:0;">+ Ferimento Grave</button>
+                <button type="button" id="btn-roll-ferimento" class="interactive-add-btn" style="margin-top:0;">🎲 Rolar Ferimento</button>
+              </div>
+            </div>
           </div>
 
           <div class="resources-grid">
@@ -1468,14 +1474,19 @@
               <span>SALÁRIO:</span>
               <input type="text" id="recursos-salario" />
             </label>
-            <label class="boxed-area equipment-box">
-              <span>EQUIPAMENTOS:</span>
-              <textarea id="inventario-equipamentos" rows="10"></textarea>
-            </label>
-            <label class="boxed-area goods-box">
-              <span>BENS MATERIAIS:</span>
-              <textarea id="recursos-bens_materiais" rows="10"></textarea>
-            </label>
+            <div class="boxed-area equipment-box">
+              <span>EQUIPAMENTOS</span>
+              <div id="inventario-equipamentos-lista" class="interactive-container"></div>
+              <button type="button" id="btn-add-equipamento" class="interactive-add-btn">+ Adicionar Equipamento</button>
+            </div>
+            <div class="boxed-area goods-box">
+              <span>BENS MATERIAIS</span>
+              <div id="recursos-bens_materiais-lista" class="interactive-container"></div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <button type="button" id="btn-add-moradia" class="interactive-add-btn" style="margin-top:0;">+ Moradia</button>
+                <button type="button" id="btn-add-veiculo" class="interactive-add-btn" style="margin-top:0;">+ Veículo</button>
+              </div>
+            </div>
             <div class="load-matrix">
               <label
                 ><span>CARGA LEVE:</span
@@ -1492,6 +1503,11 @@
               <label
                 ><span>PESO TOTAL:</span><input type="text" id="inventario-peso"
               /></label>
+            </div>
+            <div id="carga-status-panel" style="grid-column: 1 / -1; margin-top: 8px; padding: 10px; border: 2px solid var(--line); background: rgba(255, 255, 255, 0.48); font-size: 11px; font-family: Georgia, serif; line-height: 1.5;">
+              <strong>ESTADO DE CARGA:</strong> <span id="carga-status-text">Leve</span><br/>
+              <strong>DESLOCAMENTO:</strong> <span id="carga-deslocamento-text">9.0m</span> <span id="carga-deslocamento-detalhes" style="color: var(--muted); font-style: italic;"></span><br/>
+              <strong>PENALIDADES:</strong> <span id="carga-penalidades-text">Nenhuma</span>
             </div>
           </div>
 
@@ -1516,10 +1532,14 @@
           </div>
 
           <div class="page-four-grid">
-            <label class="boxed-area abilities-box">
-              <span>HABILIDADES</span>
-              <textarea id="habilidades-lista" rows="20"></textarea>
-            </label>
+            <div class="boxed-area abilities-box">
+              <span>HABILIDADES & PODERES</span>
+              <div id="habilidades-lista-container" class="interactive-container"></div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <button type="button" id="btn-add-habilidade" class="interactive-add-btn" style="margin-top:0;">+ Habilidade</button>
+                <button type="button" id="btn-add-poder" class="interactive-add-btn" style="margin-top:0;">+ Poder</button>
+              </div>
+            </div>
             <label class="boxed-area corruption-box">
               <span>TRANSFORMAÇÕES POR CORRUPÇÃO</span>
               <textarea id="habilidades-transformacoes" rows="12"></textarea>
@@ -1573,10 +1593,11 @@
             </div>
           </div>
 
-          <label class="boxed-area rituals-box">
+          <div class="boxed-area rituals-box">
             <span>RITUAIS</span>
-            <textarea id="habilidades-rituais" rows="12"></textarea>
-          </label>
+            <div id="habilidades-rituais-lista" class="interactive-container"></div>
+            <button type="button" id="btn-add-ritual" class="interactive-add-btn">+ Adicionar Ritual</button>
+          </div>
 
           <footer class="sheet-footer">
             <span>PÁGINA 4 - PROTOCOLO MIRAGEM</span>
@@ -1624,6 +1645,25 @@
       </button>
     </div>
 
-    <script type="module" src="script.js?v=8"></script>
+    <!-- Modal de Seleção Geral (Protocolo Miragem) -->
+    <div id="regras-selecao-modal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <span id="modal-selecao-title" class="modal-title">Adicionar Item</span>
+          <button type="button" id="modal-selecao-close" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-filters">
+          <input type="text" id="modal-selecao-search" placeholder="Buscar por nome..." />
+          <select id="modal-selecao-filter">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <div id="modal-selecao-body" class="modal-body">
+          <!-- Items renderizados dinamicamente -->
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="script.js?v=13"></script>
   </body>
 </html>

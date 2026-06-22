@@ -25,6 +25,8 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
+import { REGRAS } from "./regras.js";
+
 const firebaseConfig = {
   // Dados de autenticacao firebase
   apiKey: "AIzaSyAgFIBWXG8rS0QrQLppRYK7L8saDc4apuc", // API Key
@@ -217,7 +219,7 @@ function criarAgenteEmBranco(nomeInicial) {
       aparencia: "",
       foto_img: "",
       personalidade: "",
-      traumas: "",
+      traumas: [],
       notas: "",
     },
     recursos: {
@@ -225,18 +227,18 @@ function criarAgenteEmBranco(nomeInicial) {
       categoria: "",
       poupanca: "",
       salario: "",
-      bens_materiais: "",
+      bens_materiais: [],
       carga_leve: "",
       carga_moderada: "",
       carga_maxima: "",
     },
-    inventario: { carga: 0, peso: "", equipamentos: "", descricao: "" },
+    inventario: { carga: 0, peso: "", equipamentos: [], descricao: "" },
     combate: { rd: "", defesa: "", db: "" },
     habilidades: {
-      lista: "",
+      lista: [],
       transformacoes: "",
       marca: "",
-      rituais: "",
+      rituais: [],
       marca_img: "",
     },
   };
@@ -901,6 +903,878 @@ if (formFicha) {
   const agenteId = Number(urlParams.get("id")); // Number() lê IDs gigantes de Date.now() com mais precisão do que parseInt
   const isReadOnly = urlParams.get("readonly") === "true";
   let agenteAtual = null;
+  let saveTimeoutFicha;
+
+  const MELHORIAS_ARMAS = [
+    { nome: "Mira Laser", peso: 0.5, desc: "+1 nos testes de ataque" },
+    { nome: "Silenciador", peso: 0.5, desc: "Ataques furtivos" },
+    { nome: "Mira Telescópica", peso: 1.0, desc: "Alcance dobrado" },
+    { nome: "Cano Longo", peso: 1.0, desc: "+1d6 dano" }
+  ];
+
+  function calcularModificadorDeslocamento(traumas) {
+    let mod = 0;
+    if (!Array.isArray(traumas)) return mod;
+    traumas.forEach(t => {
+      if (t.tipo === 'ferimento') {
+        const nome = t.nome.toLowerCase();
+        if (nome.includes('perna')) {
+          mod -= 3.0;
+        } else if (nome.includes('rótula') || nome.includes('joelho')) {
+          mod -= 2.0;
+        } else if (nome.includes('pé') || nome.includes('tornozelo') || nome.includes('pe ')) {
+          mod -= 1.5;
+        }
+      }
+    });
+    return mod;
+  }
+
+  function calcularEAtualizarCargaESpeed() {
+    if (!agenteAtual) return;
+
+    // 1. Obter Força
+    const forca = Number(agenteAtual.atributos.forca) || 0;
+
+    // 2. Calcular limites
+    const cargaLeve = forca / 4;
+    const cargaModerada = forca / 2;
+    const cargaMaxima = forca;
+
+    // Atualizar inputs de limites na UI
+    const inputLeve = document.getElementById("recursos-carga_leve");
+    const inputMod = document.getElementById("recursos-carga_moderada");
+    const inputMax = document.getElementById("recursos-carga_maxima");
+
+    if (inputLeve) inputLeve.value = `${cargaLeve.toFixed(1)} kg`;
+    if (inputMod) inputMod.value = `${cargaModerada.toFixed(1)} kg`;
+    if (inputMax) inputMax.value = `${cargaMaxima.toFixed(1)} kg`;
+
+    // 3. Calcular peso atual
+    let pesoTotal = 0;
+    const equipamentos = Array.isArray(agenteAtual.inventario.equipamentos) 
+      ? agenteAtual.inventario.equipamentos 
+      : [];
+
+    equipamentos.forEach(eq => {
+      let pesoItem = parseFloat(eq.peso) || 0;
+      
+      // Adicionar peso de melhorias de armas
+      if (Array.isArray(eq.melhorias)) {
+        eq.melhorias.forEach(melName => {
+          const mel = MELHORIAS_ARMAS.find(m => m.nome === melName);
+          if (mel) pesoItem += mel.peso;
+        });
+      }
+      
+      pesoTotal += pesoItem * (Number(eq.qtd) || 1);
+    });
+
+    // Atualizar input de peso total na UI
+    const inputPeso = document.getElementById("inventario-peso");
+    if (inputPeso) inputPeso.value = `${pesoTotal.toFixed(2)} kg`;
+
+    // 4. Calcular estado de carga e penalidades
+    let cargaStatus = "Leve";
+    let penalidadeCarga = "Nenhuma";
+    let multiplierSpeed = 1.0;
+
+    if (pesoTotal > cargaMaxima) {
+      cargaStatus = "Sobrecarga";
+      penalidadeCarga = "Imóvel (Deslocamento 0m), +2 de penalidade em testes físicos";
+      multiplierSpeed = 0;
+    } else if (pesoTotal > cargaModerada) {
+      cargaStatus = "Máxima";
+      penalidadeCarga = "Deslocamento à metade, +2 de penalidade em testes físicos";
+      multiplierSpeed = 0.5;
+    } else if (pesoTotal > cargaLeve) {
+      cargaStatus = "Moderada";
+      penalidadeCarga = "Deslocamento à metade";
+      multiplierSpeed = 0.5;
+    }
+
+    // 5. Calcular deslocamento
+    // Verificar se tem habilidade "Atlético"
+    const habilidades = Array.isArray(agenteAtual.habilidades.lista) 
+      ? agenteAtual.habilidades.lista 
+      : [];
+    const temAtletico = habilidades.some(h => h.id === "atletico" || h.nome.toLowerCase() === "atlético");
+    
+    let speedBase = temAtletico ? 12.0 : 9.0;
+    const modInjuries = calcularModificadorDeslocamento(agenteAtual.perfil.traumas);
+    
+    let speedFinal = (speedBase + modInjuries) * multiplierSpeed;
+    if (speedFinal < 0) speedFinal = 0;
+
+    // 6. Atualizar UI do painel de carga e deslocamento
+    const statusText = document.getElementById("carga-status-text");
+    const displacementText = document.getElementById("carga-deslocamento-text");
+    const displacementDetails = document.getElementById("carga-deslocamento-detalhes");
+    const penaltiesText = document.getElementById("carga-penalidades-text");
+
+    if (statusText) {
+      statusText.textContent = cargaStatus;
+      if (cargaStatus === "Leve") statusText.style.color = "green";
+      else if (cargaStatus === "Moderada") statusText.style.color = "orange";
+      else if (cargaStatus === "Máxima") statusText.style.color = "red";
+      else statusText.style.color = "darkred";
+    }
+
+    if (displacementText) {
+      displacementText.textContent = `${speedFinal.toFixed(1)}m`;
+    }
+
+    if (displacementDetails) {
+      let details = `(Base: ${speedBase}m`;
+      if (modInjuries !== 0) details += `, Clínico: ${modInjuries.toFixed(1)}m`;
+      if (multiplierSpeed !== 1.0) details += `, Carga: x${multiplierSpeed}`;
+      details += `)`;
+      displacementDetails.textContent = details;
+    }
+
+    if (penaltiesText) {
+      penaltiesText.textContent = penalidadeCarga;
+    }
+
+    // Gravar no Firebase se os valores calculados diferirem do banco
+    const updates = {};
+    const clStr = `${cargaLeve.toFixed(1)} kg`;
+    const cmStr = `${cargaModerada.toFixed(1)} kg`;
+    const cxStr = `${cargaMaxima.toFixed(1)} kg`;
+    const ptStr = `${pesoTotal.toFixed(2)} kg`;
+
+    if (agenteAtual.recursos.carga_leve !== clStr) updates["recursos.carga_leve"] = clStr;
+    if (agenteAtual.recursos.carga_moderada !== cmStr) updates["recursos.carga_moderada"] = cmStr;
+    if (agenteAtual.recursos.carga_maxima !== cxStr) updates["recursos.carga_maxima"] = cxStr;
+    if (agenteAtual.inventario.peso !== ptStr) updates["inventario.peso"] = ptStr;
+
+    if (Object.keys(updates).length > 0) {
+      updateDoc(doc(db, "agentes", String(agenteAtual.id)), updates).catch(e => console.error("Erro ao gravar limites automáticos:", e));
+    }
+  }
+
+  function renderizarTraumas() {
+    const container = document.getElementById("traumas-clinicos-container");
+    if (!container) return;
+    container.innerHTML = "";
+    
+    const traumas = Array.isArray(agenteAtual?.perfil?.traumas) ? agenteAtual.perfil.traumas : [];
+    if (traumas.length === 0) {
+      container.innerHTML = '<p style="color: var(--muted); font-style: italic; font-size: 11px; margin: 0;">Nenhum trauma clínico registrado.</p>';
+      return;
+    }
+
+    traumas.forEach((t, index) => {
+      const card = document.createElement("div");
+      card.className = "interactive-item-card";
+      
+      const isFerimento = t.tipo === "ferimento";
+      const badge = isFerimento ? "Ferimento Grave" : "Fobia/Mania";
+      const desc = t.efeito || t.descricao || "";
+
+      card.innerHTML = `
+        <div class="item-card-header">
+          <span class="item-card-title">${t.nome}</span>
+          ${isReadOnly ? "" : `<button type="button" class="item-card-remove" onclick="window.removerTrauma(${index})">Remover</button>`}
+        </div>
+        <div class="item-card-details">${badge}</div>
+        ${desc ? `<div class="item-card-desc">${desc}</div>` : ""}
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  function renderizarEquipamentos() {
+    const container = document.getElementById("inventario-equipamentos-lista");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const equipamentos = Array.isArray(agenteAtual?.inventario?.equipamentos) ? agenteAtual.inventario.equipamentos : [];
+    if (equipamentos.length === 0) {
+      container.innerHTML = '<p style="color: var(--muted); font-style: italic; font-size: 11px; margin: 0;">Nenhum equipamento no inventário.</p>';
+      return;
+    }
+
+    equipamentos.forEach((eq, index) => {
+      const card = document.createElement("div");
+      card.className = "interactive-item-card";
+
+      const isArma = eq.tipo && (eq.tipo.toLowerCase().includes("cc") || eq.tipo.toLowerCase().includes("dist") || eq.tipo.toLowerCase().includes("arma"));
+      const isAtaqueDisparo = isArma && eq.munMax > 0;
+      
+      let detailsStr = `Peso: ${eq.peso} kg`;
+      if (eq.dano && eq.dano !== "-") detailsStr += ` | Dano: ${eq.dano}`;
+      if (eq.fa && eq.fa !== "-") detailsStr += ` | Falha: ${eq.fa}`;
+
+      let controlsHtml = `
+        <div class="item-card-controls">
+          <label>Qtd:
+            <input type="number" min="1" value="${eq.qtd || 1}" ${isReadOnly ? "disabled" : ""} onchange="window.alterarQuantidadeEquipamento(${index}, this.value)" style="width: 40px;" />
+          </label>
+      `;
+
+      if (isAtaqueDisparo) {
+        controlsHtml += `
+          <label>Munição:
+            <input type="number" min="0" max="${eq.munMax}" value="${eq.mun || 0}" ${isReadOnly ? "disabled" : ""} onchange="window.alterarMunicaoEquipamento(${index}, this.value)" style="width: 45px;" />
+            / ${eq.munMax}
+          </label>
+        `;
+      }
+
+      controlsHtml += `</div>`;
+
+      let upgradesHtml = "";
+      if (isArma && !isReadOnly) {
+        upgradesHtml = `<div class="item-card-upgrades"><strong>Melhorias:</strong><br/>`;
+        MELHORIAS_ARMAS.forEach(mel => {
+          const checked = Array.isArray(eq.melhorias) && eq.melhorias.includes(mel.nome) ? "checked" : "";
+          upgradesHtml += `
+            <label style="margin-right: 8px; display: inline-block;">
+              <input type="checkbox" ${checked} onchange="window.toggleUpgrade(${index}, '${mel.nome}', this.checked)" />
+              ${mel.nome} (+${mel.peso}kg)
+            </label>
+          `;
+        });
+        upgradesHtml += `</div>`;
+      } else if (isArma && Array.isArray(eq.melhorias) && eq.melhorias.length > 0) {
+        upgradesHtml = `<div class="item-card-upgrades"><strong>Melhorias:</strong> ${eq.melhorias.join(", ")}</div>`;
+      }
+
+      card.innerHTML = `
+        <div class="item-card-header">
+          <span class="item-card-title">${eq.nome}</span>
+          ${isReadOnly ? "" : `<button type="button" class="item-card-remove" onclick="window.removerEquipamento(${index})">Remover</button>`}
+        </div>
+        <div class="item-card-details">${detailsStr}</div>
+        ${upgradesHtml}
+        ${controlsHtml}
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  function renderizarBensMateriais() {
+    const container = document.getElementById("recursos-bens_materiais-lista");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const bens = Array.isArray(agenteAtual?.recursos?.bens_materiais) ? agenteAtual.recursos.bens_materiais : [];
+    if (bens.length === 0) {
+      container.innerHTML = '<p style="color: var(--muted); font-style: italic; font-size: 11px; margin: 0;">Nenhum bem material registrado.</p>';
+      return;
+    }
+
+    bens.forEach((bem, index) => {
+      const card = document.createElement("div");
+      card.className = "interactive-item-card";
+
+      const isMoradia = bem.tipo === "moradia";
+      const detailsStr = isMoradia ? `Moradia | Custo: ${bem.preco || 0} Créditos` : `Veículo | Velocidade: ${bem.velocidade || "N/A"} | Custo: ${bem.preco || 0} Créditos`;
+
+      let upgradesHtml = "";
+      if (isMoradia && !isReadOnly) {
+        upgradesHtml = `<div class="item-card-upgrades"><strong>Melhorias de Moradia:</strong><br/>`;
+        REGRAS.melhoriasMoradia.forEach(mel => {
+          const checked = Array.isArray(bem.upgrades) && bem.upgrades.includes(mel.nome) ? "checked" : "";
+          upgradesHtml += `
+            <label style="margin-right: 8px; display: inline-block;">
+              <input type="checkbox" ${checked} onchange="window.toggleMoradiaUpgrade(${index}, '${mel.nome}', this.checked)" />
+              ${mel.nome} (${mel.preco}¢)
+            </label>
+          `;
+        });
+        upgradesHtml += `</div>`;
+      } else if (isMoradia && Array.isArray(bem.upgrades) && bem.upgrades.length > 0) {
+        upgradesHtml = `<div class="item-card-upgrades"><strong>Melhorias:</strong> ${bem.upgrades.join(", ")}</div>`;
+      }
+
+      card.innerHTML = `
+        <div class="item-card-header">
+          <span class="item-card-title">${bem.nome}</span>
+          ${isReadOnly ? "" : `<button type="button" class="item-card-remove" onclick="window.removerBemMaterial(${index})">Remover</button>`}
+        </div>
+        <div class="item-card-details">${detailsStr}</div>
+        ${upgradesHtml}
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  function renderizarHabilidadesPoderes() {
+    const container = document.getElementById("habilidades-lista-container");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const lista = Array.isArray(agenteAtual?.habilidades?.lista) ? agenteAtual.habilidades.lista : [];
+    if (lista.length === 0) {
+      container.innerHTML = '<p style="color: var(--muted); font-style: italic; font-size: 11px; margin: 0;">Nenhuma habilidade ou poder registrado.</p>';
+      return;
+    }
+
+    lista.forEach((item, index) => {
+      const card = document.createElement("div");
+      card.className = "interactive-item-card";
+
+      const isPoder = item.tipo === "poder";
+      let typeStr = isPoder ? `Poder de Incógnita - ${item.vertente}` : `Habilidade - ${item.categoria}`;
+      if (item.custo && item.custo !== "-") typeStr += ` | Custo: ${item.custo}`;
+
+      let extraInfoHtml = "";
+      if (isPoder && item.afinidade) {
+        extraInfoHtml = `<div style="font-size:10px; color:#ba55d3; margin-top:2px;"><strong>Afinidade:</strong> ${item.afinidade}</div>`;
+      } else if (!isPoder && item.requisito && item.requisito !== "-") {
+        extraInfoHtml = `<div style="font-size:10px; color:#555; margin-top:2px;"><strong>Requisito:</strong> ${item.requisito}</div>`;
+      }
+
+      card.innerHTML = `
+        <div class="item-card-header">
+          <span class="item-card-title">${item.nome}</span>
+          ${isReadOnly ? "" : `<button type="button" class="item-card-remove" onclick="window.removerHabilidadePoder(${index})">Remover</button>`}
+        </div>
+        <div class="item-card-details">${typeStr}</div>
+        <div class="item-card-desc">${item.descricao}</div>
+        ${extraInfoHtml}
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  function renderizarRituais() {
+    const container = document.getElementById("habilidades-rituais-lista");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const rituais = Array.isArray(agenteAtual?.habilidades?.rituais) ? agenteAtual.habilidades.rituais : [];
+    if (rituais.length === 0) {
+      container.innerHTML = '<p style="color: var(--muted); font-style: italic; font-size: 11px; margin: 0;">Nenhum ritual adicionado.</p>';
+      return;
+    }
+
+    rituais.forEach((rit, index) => {
+      const card = document.createElement("div");
+      card.className = "interactive-item-card";
+
+      let detailsStr = `Ritual ${rit.circulo} | Aspecto: ${rit.aspecto}`;
+      if (rit.custo) detailsStr += ` | Custo: ${rit.custo}`;
+      if (rit.alc && rit.alc !== "-") detailsStr += ` | Alcance: ${rit.alc}`;
+      if (rit.target && rit.target !== "-") detailsStr += ` | Alvo: ${rit.target}`;
+      if (rit.duracao && rit.duracao !== "-") detailsStr += ` | Duração: ${rit.duracao}`;
+
+      card.innerHTML = `
+        <div class="item-card-header">
+          <span class="item-card-title">${rit.nome}</span>
+          ${isReadOnly ? "" : `<button type="button" class="item-card-remove" onclick="window.removerRitual(${index})">Remover</button>`}
+        </div>
+        <div class="item-card-details">${detailsStr}</div>
+        <div class="item-card-desc">${rit.desc}</div>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  function renderizarTudoInterativo() {
+    renderizarTraumas();
+    renderizarEquipamentos();
+    renderizarBensMateriais();
+    renderizarHabilidadesPoderes();
+    renderizarRituais();
+    calcularEAtualizarCargaESpeed();
+  }
+
+  let currentModalType = "";
+
+  window.abrirModalSelecao = (tipo) => {
+    if (isReadOnly) return;
+    currentModalType = tipo;
+    
+    const modal = document.getElementById("regras-selecao-modal");
+    const title = document.getElementById("modal-selecao-title");
+    const searchInput = document.getElementById("modal-selecao-search");
+    const filterSelect = document.getElementById("modal-selecao-filter");
+
+    if (!modal) return;
+
+    searchInput.value = "";
+    filterSelect.innerHTML = '<option value="">Todos</option>';
+    
+    if (tipo === "fobia") {
+      title.textContent = "Adicionar Fobia/Mania";
+      filterSelect.style.display = "none";
+    } else if (tipo === "ferimento") {
+      title.textContent = "Adicionar Ferimento Grave";
+      filterSelect.style.display = "none";
+    } else if (tipo === "habilidade") {
+      title.textContent = "Adicionar Habilidade";
+      filterSelect.style.display = "block";
+      const cats = ["Combate", "Físico", "Intelectual", "Social", "Véu"];
+      cats.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c;
+        filterSelect.appendChild(opt);
+      });
+    } else if (tipo === "poder") {
+      title.textContent = "Adicionar Poder de Incógnita";
+      filterSelect.style.display = "block";
+      const vertentes = ["Uncanny", "Paranoia", "Angústia", "Selvagem", "Nesting", "Erradicação", "Opressão"];
+      vertentes.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v;
+        opt.textContent = v;
+        filterSelect.appendChild(opt);
+      });
+    } else if (tipo === "ritual") {
+      title.textContent = "Adicionar Ritual";
+      filterSelect.style.display = "block";
+      const circulos = ["Básico", "Soberano", "Absoluto"];
+      circulos.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c;
+        filterSelect.appendChild(opt);
+      });
+    } else if (tipo === "equipamento") {
+      title.textContent = "Adicionar Equipamento";
+      filterSelect.style.display = "block";
+      const cats = [
+        { val: "armas", label: "Armas (Corpo a Corpo e Fogo)" },
+        { val: "explosivos", label: "Explosivos" },
+        { val: "gerais", label: "Equipamentos Gerais" },
+        { val: "vestimentas", label: "Vestimentas e Proteções" },
+        { val: "veu", label: "Equipamentos do Véu" }
+      ];
+      cats.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c.val;
+        opt.textContent = c.label;
+        filterSelect.appendChild(opt);
+      });
+    } else if (tipo === "moradia") {
+      title.textContent = "Adicionar Moradia";
+      filterSelect.style.display = "none";
+    } else if (tipo === "veiculo") {
+      title.textContent = "Adicionar Veículo";
+      filterSelect.style.display = "none";
+    }
+
+    filtrarItensModal();
+    modal.classList.remove("hidden");
+  };
+
+  function filtrarItensModal() {
+    const queryStr = document.getElementById("modal-selecao-search")?.value.toLowerCase() || "";
+    const filterVal = document.getElementById("modal-selecao-filter")?.value || "";
+    const body = document.getElementById("modal-selecao-body");
+    if (!body) return;
+    body.innerHTML = "";
+
+    let items = [];
+
+    if (currentModalType === "fobia") {
+      items = REGRAS.fobias.map(f => ({ ...f, type: "fobia" }));
+    } else if (currentModalType === "ferimento") {
+      items = REGRAS.ferimentos.map(f => ({ ...f, type: "ferimento" }));
+    } else if (currentModalType === "habilidade") {
+      items = REGRAS.habilidades.map(h => ({ ...h, type: "habilidade" }));
+      if (filterVal) {
+        items = items.filter(h => h.categoria === filterVal);
+      }
+    } else if (currentModalType === "poder") {
+      items = REGRAS.poderes.map(p => ({ ...p, type: "poder" }));
+      if (filterVal) {
+        items = items.filter(p => p.vertente === filterVal);
+      }
+    } else if (currentModalType === "ritual") {
+      items = REGRAS.rituais.map(r => ({ ...r, type: "ritual" }));
+      if (filterVal) {
+        items = items.filter(r => r.circulo === filterVal);
+      }
+    } else if (currentModalType === "equipamento") {
+      const armas = REGRAS.armas.map(a => ({ ...a, eqType: "armas", category: "Arma" }));
+      const explosivos = REGRAS.explosivos.map(e => ({ ...e, eqType: "explosivos", category: "Explosivo" }));
+      const gerais = REGRAS.equipamentosGerais.map(g => ({ ...g, eqType: "gerais", category: "Geral" }));
+      const vestimentas = REGRAS.vestimentas.map(v => ({ ...v, eqType: "vestimentas", category: "Vestimenta" }));
+      const veu = REGRAS.equipamentosVeu.map(v => ({ ...v, eqType: "veu", category: "Véu" }));
+
+      if (filterVal === "armas") items = armas;
+      else if (filterVal === "explosivos") items = explosivos;
+      else if (filterVal === "gerais") items = gerais;
+      else if (filterVal === "vestimentas") items = vestimentas;
+      else if (filterVal === "veu") items = veu;
+      else {
+        items = [...armas, ...explosivos, ...gerais, ...vestimentas, ...veu];
+      }
+    } else if (currentModalType === "moradia") {
+      items = REGRAS.moradias.map(m => ({ ...m, type: "moradia" }));
+    } else if (currentModalType === "veiculo") {
+      items = REGRAS.veiculos.map(v => ({ ...v, type: "veiculo" }));
+    }
+
+    if (queryStr) {
+      items = items.filter(item => item.nome.toLowerCase().includes(queryStr));
+    }
+
+    if (items.length === 0) {
+      body.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">Nenhum item encontrado.</p>';
+      return;
+    }
+
+    items.forEach((item, idx) => {
+      const row = document.createElement("div");
+      row.className = "modal-list-item";
+
+      let detailsStr = "";
+      let descStr = item.descricao || item.desc || item.efeito || "";
+
+      if (currentModalType === "habilidade") {
+        detailsStr = `Categoria: ${item.categoria} | Custo: ${item.custo}`;
+        if (item.requisito && item.requisito !== "-") detailsStr += ` | Requisito: ${item.requisito}`;
+      } else if (currentModalType === "poder") {
+        detailsStr = `Vertente: ${item.vertente} | Custo: ${item.custo}`;
+        if (item.afinidade) detailsStr += ` | Afinidade: ${item.afinidade}`;
+      } else if (currentModalType === "ritual") {
+        detailsStr = `Circulo: ${item.circulo} | Aspecto: ${item.aspecto} | Custo: ${item.custo}`;
+      } else if (currentModalType === "equipamento") {
+        detailsStr = `${item.category} | Peso: ${item.peso} kg | Categoria: ${item.cat}`;
+        if (item.dano) detailsStr += ` | Dano: ${item.dano}`;
+      } else if (currentModalType === "moradia") {
+        detailsStr = `Custo: ${item.preco} Créditos`;
+      } else if (currentModalType === "veiculo") {
+        detailsStr = `Tipo: ${item.tipo} | Velocidade: ${item.velocidade} | Custo: ${item.preco} Créditos`;
+      }
+
+      row.innerHTML = `
+        <div class="modal-list-item-header">
+          <span class="modal-list-item-title">${item.nome}</span>
+          <button type="button" class="modal-list-item-btn" id="modal-add-item-${idx}">+ Adicionar</button>
+        </div>
+        ${detailsStr ? `<div class="modal-list-item-details">${detailsStr}</div>` : ""}
+        ${descStr ? `<div class="modal-list-item-desc">${descStr}</div>` : ""}
+      `;
+
+      body.appendChild(row);
+
+      document.getElementById(`modal-add-item-${idx}`).onclick = () => {
+        adicionarItem(item);
+      };
+    });
+  }
+
+  function adicionarItem(item) {
+    if (isReadOnly || !agenteAtual) return;
+
+    if (currentModalType === "fobia" || currentModalType === "ferimento") {
+      if (!Array.isArray(agenteAtual.perfil.traumas)) agenteAtual.perfil.traumas = [];
+      agenteAtual.perfil.traumas.push({
+        id: item.id,
+        nome: item.nome,
+        type: currentModalType,
+        tipo: currentModalType,
+        efeito: item.efeito || item.descricao || ""
+      });
+      renderizarTraumas();
+      calcularEAtualizarCargaESpeed();
+      updateDoc(doc(db, "agentes", String(agenteId)), {
+        "perfil.traumas": agenteAtual.perfil.traumas
+      }).catch(e => console.error("Erro ao salvar trauma:", e));
+    } else if (currentModalType === "equipamento") {
+      if (!Array.isArray(agenteAtual.inventario.equipamentos)) agenteAtual.inventario.equipamentos = [];
+      agenteAtual.inventario.equipamentos.push({
+        id: item.id,
+        nome: item.nome,
+        tipo: item.tipo || item.category,
+        peso: item.peso || 0,
+        qtd: 1,
+        mun: 0,
+        munMax: parseInt(item.mun) || 0,
+        melhorias: [],
+        fa: item.fa || "-",
+        dano: item.dano || "-"
+      });
+      renderizarEquipamentos();
+      calcularEAtualizarCargaESpeed();
+      salvarEquipamentosNuvem();
+    } else if (currentModalType === "moradia") {
+      if (!Array.isArray(agenteAtual.recursos.bens_materiais)) agenteAtual.recursos.bens_materiais = [];
+      agenteAtual.recursos.bens_materiais.push({
+        id: item.id,
+        nome: item.nome,
+        tipo: "moradia",
+        preco: item.preco,
+        upgrades: []
+      });
+      renderizarBensMateriais();
+      salvarBensMateriaisNuvem();
+    } else if (currentModalType === "veiculo") {
+      if (!Array.isArray(agenteAtual.recursos.bens_materiais)) agenteAtual.recursos.bens_materiais = [];
+      agenteAtual.recursos.bens_materiais.push({
+        id: item.id,
+        nome: item.nome,
+        tipo: "veiculo",
+        preco: item.preco,
+        velocidade: item.velocidade || "N/A"
+      });
+      renderizarBensMateriais();
+      salvarBensMateriaisNuvem();
+    } else if (currentModalType === "habilidade") {
+      if (!Array.isArray(agenteAtual.habilidades.lista)) agenteAtual.habilidades.lista = [];
+      agenteAtual.habilidades.lista.push({
+        id: item.id,
+        nome: item.nome,
+        tipo: "habilidade",
+        categoria: item.categoria,
+        custo: item.custo,
+        descricao: item.descricao,
+        requisito: item.requisito || "-"
+      });
+      renderizarHabilidadesPoderes();
+      calcularEAtualizarCargaESpeed();
+      updateDoc(doc(db, "agentes", String(agenteId)), {
+        "habilidades.lista": agenteAtual.habilidades.lista
+      }).catch(e => console.error("Erro ao salvar habilidade:", e));
+    } else if (currentModalType === "poder") {
+      if (!Array.isArray(agenteAtual.habilidades.lista)) agenteAtual.habilidades.lista = [];
+      agenteAtual.habilidades.lista.push({
+        id: item.id,
+        nome: item.nome,
+        tipo: "poder",
+        vertente: item.vertente,
+        custo: item.custo,
+        descricao: item.descricao,
+        afinidade: item.afinidade || ""
+      });
+      renderizarHabilidadesPoderes();
+      
+      const numPoderes = agenteAtual.habilidades.lista.filter(x => x.tipo === "poder").length;
+      const calculatedGC = 50 + numPoderes * 5;
+      agenteAtual.status.gc = calculatedGC;
+      const gcInput = document.getElementById("status-gc");
+      if (gcInput) gcInput.value = calculatedGC;
+
+      updateDoc(doc(db, "agentes", String(agenteId)), {
+        "habilidades.lista": agenteAtual.habilidades.lista,
+        "status.gc": calculatedGC
+      }).catch(e => console.error("Erro ao salvar poder e GC:", e));
+    } else if (currentModalType === "ritual") {
+      if (!Array.isArray(agenteAtual.habilidades.rituais)) agenteAtual.habilidades.rituais = [];
+      agenteAtual.habilidades.rituais.push({
+        id: item.id,
+        nome: item.nome,
+        circulo: item.circulo,
+        aspecto: item.aspecto,
+        custo: item.custo,
+        alc: item.alc,
+        target: item.target,
+        duracao: item.duracao,
+        resistencia: item.resistencia,
+        desc: item.desc
+      });
+      renderizarRituais();
+      salvarRituaisNuvem();
+    }
+
+    document.getElementById("regras-selecao-modal").classList.add("hidden");
+  }
+
+  window.removerTrauma = (index) => {
+    if (isReadOnly) return;
+    agenteAtual.perfil.traumas.splice(index, 1);
+    renderizarTraumas();
+    calcularEAtualizarCargaESpeed();
+    updateDoc(doc(db, "agentes", String(agenteId)), {
+      "perfil.traumas": agenteAtual.perfil.traumas
+    }).catch(e => console.error("Erro ao salvar traumas:", e));
+  };
+
+  window.removerEquipamento = (index) => {
+    if (isReadOnly) return;
+    agenteAtual.inventario.equipamentos.splice(index, 1);
+    renderizarEquipamentos();
+    calcularEAtualizarCargaESpeed();
+    salvarEquipamentosNuvem();
+  };
+
+  window.alterarQuantidadeEquipamento = (index, value) => {
+    if (isReadOnly) return;
+    const val = parseInt(value) || 1;
+    agenteAtual.inventario.equipamentos[index].qtd = val;
+    calcularEAtualizarCargaESpeed();
+    salvarEquipamentosNuvem();
+  };
+
+  window.alterarMunicaoEquipamento = (index, value) => {
+    if (isReadOnly) return;
+    const val = parseInt(value) || 0;
+    agenteAtual.inventario.equipamentos[index].mun = val;
+    salvarEquipamentosNuvem();
+  };
+
+  window.toggleUpgrade = (index, melNome, isChecked) => {
+    if (isReadOnly) return;
+    const eq = agenteAtual.inventario.equipamentos[index];
+    if (!Array.isArray(eq.melhorias)) eq.melhorias = [];
+    
+    if (isChecked) {
+      if (!eq.melhorias.includes(melNome)) eq.melhorias.push(melNome);
+    } else {
+      eq.melhorias = eq.melhorias.filter(m => m !== melNome);
+    }
+    
+    renderizarEquipamentos();
+    calcularEAtualizarCargaESpeed();
+    salvarEquipamentosNuvem();
+  };
+
+  function salvarEquipamentosNuvem() {
+    updateDoc(doc(db, "agentes", String(agenteId)), {
+      "inventario.equipamentos": agenteAtual.inventario.equipamentos
+    }).catch(e => console.error("Erro ao salvar equipamentos:", e));
+  }
+
+  window.removerBemMaterial = (index) => {
+    if (isReadOnly) return;
+    agenteAtual.recursos.bens_materiais.splice(index, 1);
+    renderizarBensMateriais();
+    salvarBensMateriaisNuvem();
+  };
+
+  window.toggleMoradiaUpgrade = (index, melNome, isChecked) => {
+    if (isReadOnly) return;
+    const bem = agenteAtual.recursos.bens_materiais[index];
+    if (!Array.isArray(bem.upgrades)) bem.upgrades = [];
+
+    if (isChecked) {
+      if (!bem.upgrades.includes(melNome)) bem.upgrades.push(melNome);
+    } else {
+      bem.upgrades = bem.upgrades.filter(u => u !== melNome);
+    }
+
+    renderizarBensMateriais();
+    salvarBensMateriaisNuvem();
+  };
+
+  function salvarBensMateriaisNuvem() {
+    updateDoc(doc(db, "agentes", String(agenteId)), {
+      "recursos.bens_materiais": agenteAtual.recursos.bens_materiais
+    }).catch(e => console.error("Erro ao salvar bens materiais:", e));
+  }
+
+  window.removerHabilidadePoder = (index) => {
+    if (isReadOnly) return;
+    const item = agenteAtual.habilidades.lista[index];
+    agenteAtual.habilidades.lista.splice(index, 1);
+    
+    renderizarHabilidadesPoderes();
+    calcularEAtualizarCargaESpeed();
+
+    if (item.tipo === "poder") {
+      const numPoderes = agenteAtual.habilidades.lista.filter(x => x.tipo === "poder").length;
+      const calculatedGC = 50 + numPoderes * 5;
+      agenteAtual.status.gc = calculatedGC;
+      const gcInput = document.getElementById("status-gc");
+      if (gcInput) gcInput.value = calculatedGC;
+      
+      updateDoc(doc(db, "agentes", String(agenteId)), {
+        "habilidades.lista": agenteAtual.habilidades.lista,
+        "status.gc": calculatedGC
+      }).catch(e => console.error("Erro ao salvar lista de habilidades e GC:", e));
+    } else {
+      updateDoc(doc(db, "agentes", String(agenteId)), {
+        "habilidades.lista": agenteAtual.habilidades.lista
+      }).catch(e => console.error("Erro ao salvar lista de habilidades:", e));
+    }
+  };
+
+  window.removerRitual = (index) => {
+    if (isReadOnly) return;
+    agenteAtual.habilidades.rituais.splice(index, 1);
+    renderizarRituais();
+    salvarRituaisNuvem();
+  };
+
+  function salvarRituaisNuvem() {
+    updateDoc(doc(db, "agentes", String(agenteId)), {
+      "habilidades.rituais": agenteAtual.habilidades.rituais
+    }).catch(e => console.error("Erro ao salvar rituais:", e));
+  }
+
+  window.rolarFobia = () => {
+    if (isReadOnly) return;
+    const roll = Math.floor(Math.random() * 100) + 1;
+    const fobia = REGRAS.fobias.find(f => f.id === roll);
+    if (fobia) {
+      if (!Array.isArray(agenteAtual.perfil.traumas)) agenteAtual.perfil.traumas = [];
+      agenteAtual.perfil.traumas.push({
+        id: fobia.id,
+        nome: fobia.nome,
+        type: "fobia",
+        tipo: "fobia",
+        efeito: fobia.descricao || ""
+      });
+      renderizarTraumas();
+      calcularEAtualizarCargaESpeed();
+      updateDoc(doc(db, "agentes", String(agenteId)), {
+        "perfil.traumas": agenteAtual.perfil.traumas
+      }).catch(e => console.error("Erro ao rolar fobia:", e));
+      alert(`Rolou ${roll} na tabela de Fobias/Manias!\nAdicionado: ${fobia.nome}`);
+    }
+  };
+
+  window.rolarFerimento = () => {
+    if (isReadOnly) return;
+    const roll = Math.floor(Math.random() * 100) + 1;
+    const ferimento = REGRAS.ferimentos.find(f => f.id === roll);
+    if (ferimento) {
+      if (!Array.isArray(agenteAtual.perfil.traumas)) agenteAtual.perfil.traumas = [];
+      agenteAtual.perfil.traumas.push({
+        id: ferimento.id,
+        nome: ferimento.nome,
+        type: "ferimento",
+        tipo: "ferimento",
+        efeito: ferimento.efeito || ""
+      });
+      renderizarTraumas();
+      calcularEAtualizarCargaESpeed();
+      updateDoc(doc(db, "agentes", String(agenteId)), {
+        "perfil.traumas": agenteAtual.perfil.traumas
+      }).catch(e => console.error("Erro ao rolar ferimento:", e));
+      alert(`Rolou ${roll} na tabela de Ferimentos Graves!\nAdicionado: ${ferimento.nome}\nEfeito: ${ferimento.efeito || "Sem efeito descrito"}`);
+    }
+  };
+
+  const setupInteractiveButtons = () => {
+    const addFobia = document.getElementById("btn-add-fobia");
+    const rollFobia = document.getElementById("btn-roll-fobia");
+    const addFerimento = document.getElementById("btn-add-ferimento");
+    const rollFerimento = document.getElementById("btn-roll-ferimento");
+    
+    const addEquipamento = document.getElementById("btn-add-equipamento");
+    
+    const addMoradia = document.getElementById("btn-add-moradia");
+    const addVeiculo = document.getElementById("btn-add-veiculo");
+    
+    const addHabilidade = document.getElementById("btn-add-habilidade");
+    const addPoder = document.getElementById("btn-add-poder");
+    
+    const addRitual = document.getElementById("btn-add-ritual");
+
+    if (addFobia) addFobia.onclick = () => abrirModalSelecao("fobia");
+    if (rollFobia) rollFobia.onclick = () => rolarFobia();
+    if (addFerimento) addFerimento.onclick = () => abrirModalSelecao("ferimento");
+    if (rollFerimento) rollFerimento.onclick = () => rolarFerimento();
+    
+    if (addEquipamento) addEquipamento.onclick = () => abrirModalSelecao("equipamento");
+    
+    if (addMoradia) addMoradia.onclick = () => abrirModalSelecao("moradia");
+    if (addVeiculo) addVeiculo.onclick = () => abrirModalSelecao("veiculo");
+    
+    if (addHabilidade) addHabilidade.onclick = () => abrirModalSelecao("habilidade");
+    if (addPoder) addPoder.onclick = () => abrirModalSelecao("poder");
+    
+    if (addRitual) addRitual.onclick = () => abrirModalSelecao("ritual");
+  };
+
   let pendingUpdates = {};
   let saveTimeoutFicha;
 
@@ -1025,7 +1899,9 @@ if (formFicha) {
         const marcaContainer = document.getElementById("marca-container");
         if (marcaContainer) marcaContainer.onclick = null;
       }
+      renderizarTudoInterativo();
     });
+    setupInteractiveButtons();
   }
 
   formFicha.addEventListener("input", (evento) => {
