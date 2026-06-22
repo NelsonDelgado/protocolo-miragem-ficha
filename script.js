@@ -903,6 +903,7 @@ if (formFicha) {
   const agenteId = Number(urlParams.get("id")); // Number() lê IDs gigantes de Date.now() com mais precisão do que parseInt
   const isReadOnly = urlParams.get("readonly") === "true";
   let agenteAtual = null;
+  let pendingUpdates = {};
   let saveTimeoutFicha;
 
   const MELHORIAS_ARMAS = [
@@ -1774,9 +1775,6 @@ if (formFicha) {
     
     if (addRitual) addRitual.onclick = () => abrirModalSelecao("ritual");
   };
-
-  let pendingUpdates = {};
-  let saveTimeoutFicha;
 
   function atualizarCampoDebounced(categoria, chave, valor) {
     pendingUpdates[`${categoria}.${chave}`] = valor;
