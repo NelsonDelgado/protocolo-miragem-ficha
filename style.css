@@ -1125,8 +1125,17 @@ body.dark-theme #lista-personagens > div {
   background: rgba(30, 30, 30, 0.8);
 }
 
-body.dark-theme .level-table {
+body.dark-theme .level-table,
+body.dark-theme .status-box,
+body.dark-theme .gc-box {
   background: rgba(30, 30, 30, 0.58);
+}
+
+body.dark-theme .status-box input,
+body.dark-theme .gc-box input,
+body.dark-theme .level-fields input,
+body.dark-theme .load-box input {
+  background: transparent;
 }
 
 body.dark-theme .label-col,
