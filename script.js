@@ -1774,6 +1774,30 @@ if (formFicha) {
     if (addPoder) addPoder.onclick = () => abrirModalSelecao("poder");
     
     if (addRitual) addRitual.onclick = () => abrirModalSelecao("ritual");
+
+    // Lógica para fechar o modal de seleção de regras
+    const modalSelecao = document.getElementById("regras-selecao-modal");
+    const closeSelecao = document.getElementById("modal-selecao-close");
+    if (closeSelecao && modalSelecao) {
+      closeSelecao.onclick = () => {
+        modalSelecao.classList.add("hidden");
+      };
+      modalSelecao.onclick = (e) => {
+        if (e.target === modalSelecao) {
+          modalSelecao.classList.add("hidden");
+        }
+      };
+    }
+
+    // Lógica para busca e filtragem em tempo real no modal
+    const searchInput = document.getElementById("modal-selecao-search");
+    const filterSelect = document.getElementById("modal-selecao-filter");
+    if (searchInput) {
+      searchInput.addEventListener("input", () => filtrarItensModal());
+    }
+    if (filterSelect) {
+      filterSelect.addEventListener("change", () => filtrarItensModal());
+    }
   };
 
   function atualizarCampoDebounced(categoria, chave, valor) {
