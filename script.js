@@ -932,126 +932,6 @@ if (formFicha) {
   }
 
   function calcularEAtualizarCargaESpeed() {
-    if (!agenteAtual) return;
-
-    // 1. Obter Força
-    const forca = Number(agenteAtual.atributos.forca) || 0;
-
-    // 2. Calcular limites
-    const cargaLeve = forca / 4;
-    const cargaModerada = forca / 2;
-    const cargaMaxima = forca;
-
-    // Atualizar inputs de limites na UI
-    const inputLeve = document.getElementById("recursos-carga_leve");
-    const inputMod = document.getElementById("recursos-carga_moderada");
-    const inputMax = document.getElementById("recursos-carga_maxima");
-
-    if (inputLeve) inputLeve.value = `${cargaLeve.toFixed(1)} kg`;
-    if (inputMod) inputMod.value = `${cargaModerada.toFixed(1)} kg`;
-    if (inputMax) inputMax.value = `${cargaMaxima.toFixed(1)} kg`;
-
-    // 3. Calcular peso atual
-    let pesoTotal = 0;
-    const equipamentos = Array.isArray(agenteAtual.inventario.equipamentos) 
-      ? agenteAtual.inventario.equipamentos 
-      : [];
-
-    equipamentos.forEach(eq => {
-      let pesoItem = parseFloat(eq.peso) || 0;
-      
-      // Adicionar peso de melhorias de armas
-      if (Array.isArray(eq.melhorias)) {
-        eq.melhorias.forEach(melName => {
-          const mel = MELHORIAS_ARMAS.find(m => m.nome === melName);
-          if (mel) pesoItem += mel.peso;
-        });
-      }
-      
-      pesoTotal += pesoItem * (Number(eq.qtd) || 1);
-    });
-
-    // Atualizar input de peso total na UI
-    const inputPeso = document.getElementById("inventario-peso");
-    if (inputPeso) inputPeso.value = `${pesoTotal.toFixed(2)} kg`;
-
-    // 4. Calcular estado de carga e penalidades
-    let cargaStatus = "Leve";
-    let penalidadeCarga = "Nenhuma";
-    let multiplierSpeed = 1.0;
-
-    if (pesoTotal > cargaMaxima) {
-      cargaStatus = "Sobrecarga";
-      penalidadeCarga = "Imóvel (Deslocamento 0m), +2 de penalidade em testes físicos";
-      multiplierSpeed = 0;
-    } else if (pesoTotal > cargaModerada) {
-      cargaStatus = "Máxima";
-      penalidadeCarga = "Deslocamento à metade, +2 de penalidade em testes físicos";
-      multiplierSpeed = 0.5;
-    } else if (pesoTotal > cargaLeve) {
-      cargaStatus = "Moderada";
-      penalidadeCarga = "Deslocamento à metade";
-      multiplierSpeed = 0.5;
-    }
-
-    // 5. Calcular deslocamento
-    // Verificar se tem habilidade "Atlético"
-    const habilidades = Array.isArray(agenteAtual.habilidades.lista) 
-      ? agenteAtual.habilidades.lista 
-      : [];
-    const temAtletico = habilidades.some(h => h.id === "atletico" || h.nome.toLowerCase() === "atlético");
-    
-    let speedBase = temAtletico ? 12.0 : 9.0;
-    const modInjuries = calcularModificadorDeslocamento(agenteAtual.perfil.traumas);
-    
-    let speedFinal = (speedBase + modInjuries) * multiplierSpeed;
-    if (speedFinal < 0) speedFinal = 0;
-
-    // 6. Atualizar UI do painel de carga e deslocamento
-    const statusText = document.getElementById("carga-status-text");
-    const displacementText = document.getElementById("carga-deslocamento-text");
-    const displacementDetails = document.getElementById("carga-deslocamento-detalhes");
-    const penaltiesText = document.getElementById("carga-penalidades-text");
-
-    if (statusText) {
-      statusText.textContent = cargaStatus;
-      if (cargaStatus === "Leve") statusText.style.color = "green";
-      else if (cargaStatus === "Moderada") statusText.style.color = "orange";
-      else if (cargaStatus === "Máxima") statusText.style.color = "red";
-      else statusText.style.color = "darkred";
-    }
-
-    if (displacementText) {
-      displacementText.textContent = `${speedFinal.toFixed(1)}m`;
-    }
-
-    if (displacementDetails) {
-      let details = `(Base: ${speedBase}m`;
-      if (modInjuries !== 0) details += `, Clínico: ${modInjuries.toFixed(1)}m`;
-      if (multiplierSpeed !== 1.0) details += `, Carga: x${multiplierSpeed}`;
-      details += `)`;
-      displacementDetails.textContent = details;
-    }
-
-    if (penaltiesText) {
-      penaltiesText.textContent = penalidadeCarga;
-    }
-
-    // Gravar no Firebase se os valores calculados diferirem do banco
-    const updates = {};
-    const clStr = `${cargaLeve.toFixed(1)} kg`;
-    const cmStr = `${cargaModerada.toFixed(1)} kg`;
-    const cxStr = `${cargaMaxima.toFixed(1)} kg`;
-    const ptStr = `${pesoTotal.toFixed(2)} kg`;
-
-    if (agenteAtual.recursos.carga_leve !== clStr) updates["recursos.carga_leve"] = clStr;
-    if (agenteAtual.recursos.carga_moderada !== cmStr) updates["recursos.carga_moderada"] = cmStr;
-    if (agenteAtual.recursos.carga_maxima !== cxStr) updates["recursos.carga_maxima"] = cxStr;
-    if (agenteAtual.inventario.peso !== ptStr) updates["inventario.peso"] = ptStr;
-
-    if (Object.keys(updates).length > 0) {
-      updateDoc(doc(db, "agentes", String(agenteAtual.id)), updates).catch(e => console.error("Erro ao gravar limites automáticos:", e));
-    }
   }
 
   function renderizarTraumas() {
@@ -1700,60 +1580,9 @@ if (formFicha) {
     }).catch(e => console.error("Erro ao salvar rituais:", e));
   }
 
-  window.rolarFobia = () => {
-    if (isReadOnly) return;
-    const roll = Math.floor(Math.random() * 100) + 1;
-    const fobia = REGRAS.fobias.find(f => f.id === roll);
-    if (fobia) {
-      if (!Array.isArray(agenteAtual.perfil.traumas)) agenteAtual.perfil.traumas = [];
-      agenteAtual.perfil.traumas.push({
-        id: fobia.id,
-        nome: fobia.nome,
-        type: "fobia",
-        tipo: "fobia",
-        efeito: fobia.descricao || ""
-      });
-      renderizarTraumas();
-      calcularEAtualizarCargaESpeed();
-      updateDoc(doc(db, "agentes", String(agenteId)), {
-        "perfil.traumas": agenteAtual.perfil.traumas
-      }).catch(e => console.error("Erro ao rolar fobia:", e));
-      alert(`Rolou ${roll} na tabela de Fobias/Manias!\nAdicionado: ${fobia.nome}`);
-    }
-  };
-
-  window.rolarFerimento = () => {
-    if (isReadOnly) return;
-    const roll = Math.floor(Math.random() * 100) + 1;
-    const ferimento = REGRAS.ferimentos.find(f => f.id === roll);
-    if (ferimento) {
-      if (!Array.isArray(agenteAtual.perfil.traumas)) agenteAtual.perfil.traumas = [];
-      agenteAtual.perfil.traumas.push({
-        id: ferimento.id,
-        nome: ferimento.nome,
-        type: "ferimento",
-        tipo: "ferimento",
-        efeito: ferimento.efeito || ""
-      });
-      renderizarTraumas();
-      calcularEAtualizarCargaESpeed();
-      updateDoc(doc(db, "agentes", String(agenteId)), {
-        "perfil.traumas": agenteAtual.perfil.traumas
-      }).catch(e => console.error("Erro ao rolar ferimento:", e));
-      alert(`Rolou ${roll} na tabela de Ferimentos Graves!\nAdicionado: ${ferimento.nome}\nEfeito: ${ferimento.efeito || "Sem efeito descrito"}`);
-    }
-  };
-
   const setupInteractiveButtons = () => {
     const addFobia = document.getElementById("btn-add-fobia");
-    const rollFobia = document.getElementById("btn-roll-fobia");
     const addFerimento = document.getElementById("btn-add-ferimento");
-    const rollFerimento = document.getElementById("btn-roll-ferimento");
-    
-    const addEquipamento = document.getElementById("btn-add-equipamento");
-    
-    const addMoradia = document.getElementById("btn-add-moradia");
-    const addVeiculo = document.getElementById("btn-add-veiculo");
     
     const addHabilidade = document.getElementById("btn-add-habilidade");
     const addPoder = document.getElementById("btn-add-poder");
@@ -1761,14 +1590,7 @@ if (formFicha) {
     const addRitual = document.getElementById("btn-add-ritual");
 
     if (addFobia) addFobia.onclick = () => abrirModalSelecao("fobia");
-    if (rollFobia) rollFobia.onclick = () => rolarFobia();
     if (addFerimento) addFerimento.onclick = () => abrirModalSelecao("ferimento");
-    if (rollFerimento) rollFerimento.onclick = () => rolarFerimento();
-    
-    if (addEquipamento) addEquipamento.onclick = () => abrirModalSelecao("equipamento");
-    
-    if (addMoradia) addMoradia.onclick = () => abrirModalSelecao("moradia");
-    if (addVeiculo) addVeiculo.onclick = () => abrirModalSelecao("veiculo");
     
     if (addHabilidade) addHabilidade.onclick = () => abrirModalSelecao("habilidade");
     if (addPoder) addPoder.onclick = () => abrirModalSelecao("poder");
@@ -1878,6 +1700,14 @@ if (formFicha) {
               const valorBooleano = !!agenteAtual[categoria][chave];
               if (campo.checked !== valorBooleano) {
                 campo.checked = valorBooleano;
+              }
+            } else if (campo.tagName === "TEXTAREA") {
+              const val = agenteAtual[categoria][chave];
+              const stringVal = Array.isArray(val)
+                ? val.map(item => typeof item === 'object' ? (item.nome || "") : item).filter(Boolean).join(", ")
+                : (val || "");
+              if (campo.value != stringVal) {
+                campo.value = stringVal;
               }
             } else if (
               agenteAtual[categoria][chave] !== undefined &&

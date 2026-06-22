@@ -1448,11 +1448,9 @@
             <div class="boxed-area trauma-box">
               <span>PAINEL CLÍNICO (FOBIAS & FERIMENTOS)</span>
               <div id="traumas-clinicos-container" class="interactive-container"></div>
-              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                 <button type="button" id="btn-add-fobia" class="interactive-add-btn" style="margin-top:0;">+ Fobia/Mania</button>
-                <button type="button" id="btn-roll-fobia" class="interactive-add-btn" style="margin-top:0;">🎲 Rolar Fobia</button>
                 <button type="button" id="btn-add-ferimento" class="interactive-add-btn" style="margin-top:0;">+ Ferimento Grave</button>
-                <button type="button" id="btn-roll-ferimento" class="interactive-add-btn" style="margin-top:0;">🎲 Rolar Ferimento</button>
               </div>
             </div>
           </div>
@@ -1460,7 +1458,14 @@
           <div class="resources-grid">
             <label class="resource-line">
               <span>PATENTE:</span>
-              <input type="text" id="recursos-patente" />
+              <select id="recursos-patente">
+                <option value="">Nenhuma</option>
+                <option value="Scooby Doo">Scooby Doo (2 pts)</option>
+                <option value="Senritsu Kaiki World Kowasugi">Senritsu Kaiki World Kowasugi (5 pts)</option>
+                <option value="Ghost Busters">Ghost Busters (10 pts)</option>
+                <option value="Tokyo Jujutsu High">Tokyo Jujutsu High (20 pts)</option>
+                <option value="MIB">MIB (35 pts)</option>
+              </select>
             </label>
             <label class="resource-line">
               <span>CATEGORIA:</span>
@@ -1474,19 +1479,14 @@
               <span>SALÁRIO:</span>
               <input type="text" id="recursos-salario" />
             </label>
-            <div class="boxed-area equipment-box">
+            <label class="boxed-area equipment-box">
               <span>EQUIPAMENTOS</span>
-              <div id="inventario-equipamentos-lista" class="interactive-container"></div>
-              <button type="button" id="btn-add-equipamento" class="interactive-add-btn">+ Adicionar Equipamento</button>
-            </div>
-            <div class="boxed-area goods-box">
+              <textarea id="inventario-equipamentos" rows="10"></textarea>
+            </label>
+            <label class="boxed-area goods-box">
               <span>BENS MATERIAIS</span>
-              <div id="recursos-bens_materiais-lista" class="interactive-container"></div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                <button type="button" id="btn-add-moradia" class="interactive-add-btn" style="margin-top:0;">+ Moradia</button>
-                <button type="button" id="btn-add-veiculo" class="interactive-add-btn" style="margin-top:0;">+ Veículo</button>
-              </div>
-            </div>
+              <textarea id="recursos-bens_materiais" rows="10"></textarea>
+            </label>
             <div class="load-matrix">
               <label
                 ><span>CARGA LEVE:</span
@@ -1503,11 +1503,6 @@
               <label
                 ><span>PESO TOTAL:</span><input type="text" id="inventario-peso"
               /></label>
-            </div>
-            <div id="carga-status-panel" style="grid-column: 1 / -1; margin-top: 8px; padding: 10px; border: 2px solid var(--line); background: rgba(255, 255, 255, 0.48); font-size: 11px; font-family: Georgia, serif; line-height: 1.5;">
-              <strong>ESTADO DE CARGA:</strong> <span id="carga-status-text">Leve</span><br/>
-              <strong>DESLOCAMENTO:</strong> <span id="carga-deslocamento-text">9.0m</span> <span id="carga-deslocamento-detalhes" style="color: var(--muted); font-style: italic;"></span><br/>
-              <strong>PENALIDADES:</strong> <span id="carga-penalidades-text">Nenhuma</span>
             </div>
           </div>
 
