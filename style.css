@@ -1187,6 +1187,10 @@ input[type="number"]::-webkit-outer-spin-button {
   min-height: 24px;
 }
 
+.hidden {
+  display: none !important;
+}
+
 /* Modais de Seleção */
 .modal-overlay {
   position: fixed;
