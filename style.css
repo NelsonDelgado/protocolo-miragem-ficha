@@ -757,6 +757,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .boxed-area {
   display: grid;
+  grid-template-rows: auto 1fr;
   gap: 10px;
 }
 
@@ -764,6 +765,12 @@ input[type="number"]::-webkit-outer-spin-button {
   display: block;
   text-align: center;
   font-size: 21px;
+}
+
+.boxed-area textarea,
+.boxed-area #foto-container,
+.boxed-area #marca-container {
+  height: 100%;
 }
 
 .boxed-area textarea {
@@ -820,7 +827,8 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .resource-line input,
-.combat-strip input {
+.combat-strip input,
+.combat-strip textarea {
   height: 100%;
   border: 0;
 }
@@ -846,7 +854,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .load-matrix {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   border-top: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.6);
 }

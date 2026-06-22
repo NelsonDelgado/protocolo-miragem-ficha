@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ficha do Agente - Protocolo Miragem</title>
-    <link rel="stylesheet" href="style.css?v=2" />
+    <link rel="stylesheet" href="style.css?v=6" />
   </head>
   <body class="ficha-body">
     <main class="sheet-wrap" style="margin-top: 40px">
@@ -28,7 +28,7 @@
               <input type="text" id="identidade-equipe" />
             </label>
             <label class="field">
-              <span>OCUPACAO:</span>
+              <span>OCUPAÇÃO:</span>
               <input type="text" id="identidade-ocupacao" />
             </label>
           </div>
@@ -98,7 +98,7 @@
                 </div>
               </label>
               <label>
-                <span>PD <small>(Pontos de Determinacao)</small></span>
+                <span>PD <small>(Pontos de Determinação)</small></span>
                 <div
                   style="
                     display: flex;
@@ -128,7 +128,7 @@
             </div>
 
             <div class="gc-box">
-              <span>GC <small>(Grau de Corrupcao)</small></span>
+              <span>GC <small>(Grau de Corrupção)</small></span>
               <div
                 style="
                   display: flex;
@@ -196,16 +196,16 @@
           </div>
 
           <footer class="sheet-footer">
-            <span>PAGINA 1 - PROTOCOLO MIRAGEM</span>
+            <span>PÁGINA 1 - PROTOCOLO MIRAGEM</span>
             <span>FICHA DE AGENTE</span>
           </footer>
         </section>
 
         <section class="sheet-page page-two">
-          <h2 class="section-title">TABELA DE PERICIAS</h2>
+          <h2 class="section-title">TABELA DE PERÍCIAS</h2>
           <div class="skills-grid">
             <div class="skill-column">
-              <h3>FISICAS</h3>
+              <h3>FÍSICAS</h3>
               <div class="linha-pericia">
                 <input
                   type="checkbox"
@@ -473,7 +473,7 @@
                   class="checkbox-pericia"
                 />
                 <label class="label-pericia"
-                  >Prestidigitacao <small>{10%}</small></label
+                  >Prestidigitação <small>{10%}</small></label
                 ><span class="texto-secundario">Base</span
                 ><input
                   type="number"
@@ -516,7 +516,7 @@
                   class="checkbox-pericia"
                 />
                 <label class="label-pericia"
-                  >Sobrevivencia <small>{10%}</small></label
+                  >Sobrevivência <small>{10%}</small></label
                 ><span class="texto-secundario">Base</span
                 ><input
                   type="number"
@@ -675,7 +675,7 @@
                   id="pericias-ciencia_treinada"
                   class="checkbox-pericia"
                 />
-                <label class="label-pericia">Ciencia</label
+                <label class="label-pericia">Ciência</label
                 ><input
                   type="text"
                   id="pericias-ciencia_espec"
@@ -716,31 +716,6 @@
                 ><input
                   type="number"
                   id="pericias-ciencia2"
-                  class="input-mini"
-                /><span>%</span>
-              </div>
-              <div class="linha-pericia especial">
-                <input
-                  type="checkbox"
-                  id="pericias-ciencia3_treinada"
-                  class="checkbox-pericia"
-                />
-                <label class="label-pericia">Ciência III</label
-                ><input
-                  type="text"
-                  id="pericias-ciencia3_espec"
-                  placeholder="Espec..."
-                /><span class="texto-secundario">Base</span
-                ><input
-                  type="number"
-                  id="pericias-ciencia3_base"
-                  class="input-mini input-base-fixa"
-                  value="0"
-                  readonly
-                /><span>%</span><span class="texto-secundario">Atual</span
-                ><input
-                  type="number"
-                  id="pericias-ciencia3"
                   class="input-mini"
                 /><span>%</span>
               </div>
@@ -836,7 +811,7 @@
                   id="pericias-historia_treinada"
                   class="checkbox-pericia"
                 />
-                <label class="label-pericia">Historia <small>{5%}</small></label
+                <label class="label-pericia">História <small>{5%}</small></label
                 ><span class="texto-secundario">Base</span
                 ><input
                   type="number"
@@ -857,7 +832,7 @@
                   id="pericias-saber_veu_treinada"
                   class="checkbox-pericia"
                 />
-                <label class="label-pericia">Saber do Veu</label
+                <label class="label-pericia">Saber do Véu</label
                 ><span class="texto-secundario">Base</span
                 ><input
                   type="number"
@@ -917,10 +892,31 @@
               <div class="linha-pericia">
                 <input
                   type="checkbox"
+                  id="pericias-religiao_treinada"
+                  class="checkbox-pericia"
+                />
+                <label class="label-pericia">Religião <small>{5%}</small></label
+                ><span class="texto-secundario">Base</span
+                ><input
+                  type="number"
+                  id="pericias-religiao_base"
+                  class="input-mini input-base-fixa"
+                  value="5"
+                  readonly
+                /><span>%</span><span class="texto-secundario">Atual</span
+                ><input
+                  type="number"
+                  id="pericias-religiao"
+                  class="input-mini"
+                /><span>%</span>
+              </div>
+              <div class="linha-pericia">
+                <input
+                  type="checkbox"
                   id="pericias-reparos_eletricos_treinada"
                   class="checkbox-pericia"
                 />
-                <label class="label-pericia">Rep. Eletricos</label
+                <label class="label-pericia">Rep. Elétricos</label
                 ><span class="texto-secundario">Base</span
                 ><input
                   type="number"
@@ -941,7 +937,7 @@
                   id="pericias-reparos_mecanicos_treinada"
                   class="checkbox-pericia"
                 />
-                <label class="label-pericia">Rep. Mecanicos</label
+                <label class="label-pericia">Rep. Mecânicos</label
                 ><span class="texto-secundario">Base</span
                 ><input
                   type="number"
@@ -1010,7 +1006,7 @@
                   class="checkbox-pericia"
                 />
                 <label class="label-pericia"
-                  >Intuicao <small>{10%}</small></label
+                  >Intuição <small>{10%}</small></label
                 ><span class="texto-secundario">Base</span
                 ><input
                   type="number"
@@ -1128,7 +1124,7 @@
                   class="checkbox-pericia"
                 />
                 <label class="label-pericia"
-                  >Intimidacao <small>{15%}</small></label
+                  >Intimidação <small>{15%}</small></label
                 ><span class="texto-secundario">Base</span
                 ><input
                   type="number"
@@ -1170,7 +1166,7 @@
                   id="pericias-labia_treinada"
                   class="checkbox-pericia"
                 />
-                <label class="label-pericia">Labia <small>{10%}</small></label
+                <label class="label-pericia">Lábia <small>{10%}</small></label
                 ><span class="texto-secundario">Base</span
                 ><input
                   type="number"
@@ -1279,7 +1275,7 @@
                   class="checkbox-pericia"
                 />
                 <label class="label-pericia"
-                  >Psicanalise <small>{10%}</small></label
+                  >Psicanálise <small>{10%}</small></label
                 ><span class="texto-secundario">Base</span
                 ><input
                   type="number"
@@ -1300,7 +1296,7 @@
                   id="pericias-usar_veu_treinada"
                   class="checkbox-pericia"
                 />
-                <label class="label-pericia">Usar o Veu</label
+                <label class="label-pericia">Usar o Véu</label
                 ><span class="texto-secundario">Base</span
                 ><input
                   type="number"
@@ -1385,13 +1381,13 @@
               })();
             </script>
             <p class="table-legend">
-              R = Rolamento / V = Valor / C = Falha Critica / F = Falha / S =
+              R = Rolamento / V = Valor / C = Falha Crítica / F = Falha / S =
               Sucesso Normal / B = Sucesso Bom / E = Sucesso Extremo
             </p>
           </section>
 
           <footer class="sheet-footer">
-            <span>PAGINA 2 - PROTOCOLO MIRAGEM</span>
+            <span>PÁGINA 2 - PROTOCOLO MIRAGEM</span>
             <span>FICHA DE AGENTE</span>
           </footer>
         </section>
@@ -1450,7 +1446,7 @@
               <textarea id="perfil-personalidade" rows="8"></textarea>
             </label>
             <label class="boxed-area trauma-box">
-              <span>TRAUMAS / CICATRIZES / MALDICOES</span>
+              <span>TRAUMAS / CICATRIZES / MALDIÇÕES</span>
               <textarea id="perfil-traumas" rows="7"></textarea>
             </label>
           </div>
@@ -1465,11 +1461,11 @@
               <input type="text" id="recursos-categoria" />
             </label>
             <label class="resource-line">
-              <span>POUPANCA:</span>
+              <span>POUPANÇA:</span>
               <input type="text" id="recursos-poupanca" />
             </label>
             <label class="resource-line">
-              <span>SALARIO:</span>
+              <span>SALÁRIO:</span>
               <input type="text" id="recursos-salario" />
             </label>
             <label class="boxed-area equipment-box">
@@ -1490,34 +1486,29 @@
                 ><input type="text" id="recursos-carga_moderada"
               /></label>
               <label
-                ><span>CARGA MAXIMA:</span
+                ><span>CARGA MÁXIMA:</span
                 ><input type="text" id="recursos-carga_maxima"
               /></label>
               <label
-                ><span>CAPACIDADE DE CARGA:</span
-                ><input type="number" id="inventario-carga"
-              /></label>
-              <label
-                ><span>PESO TOTAL:</span
-                ><input type="text" id="inventario-peso"
+                ><span>PESO TOTAL:</span><input type="text" id="inventario-peso"
               /></label>
             </div>
           </div>
 
           <footer class="sheet-footer">
-            <span>PAGINA 3 - PROTOCOLO MIRAGEM</span>
+            <span>PÁGINA 3 - PROTOCOLO MIRAGEM</span>
             <span>FICHA DE AGENTE</span>
           </footer>
         </section>
 
         <section class="sheet-page page-four">
           <label class="boxed-area attacks-box">
-            <span>DESCRICAO DOS EQUIPAMENTOS E ATAQUES:</span>
+            <span>DESCRIÇÃO DOS EQUIPAMENTOS E ATAQUES:</span>
             <textarea id="inventario-descricao" rows="10"></textarea>
           </label>
 
           <div class="combat-strip">
-            <label><span>RD:</span><input type="text" id="combate-rd" /></label>
+            <label><span>RD:</span><textarea id="combate-rd" placeholder="RD..."></textarea></label>
             <label
               ><span>DEFESA:</span><input type="text" id="combate-defesa"
             /></label>
@@ -1530,7 +1521,7 @@
               <textarea id="habilidades-lista" rows="20"></textarea>
             </label>
             <label class="boxed-area corruption-box">
-              <span>TRANSFORMACOES POR CORRUPCAO</span>
+              <span>TRANSFORMAÇÕES POR CORRUPÇÃO</span>
               <textarea id="habilidades-transformacoes" rows="12"></textarea>
             </label>
             <div class="boxed-area mark-box">
@@ -1588,7 +1579,7 @@
           </label>
 
           <footer class="sheet-footer">
-            <span>PAGINA 4 - PROTOCOLO MIRAGEM</span>
+            <span>PÁGINA 4 - PROTOCOLO MIRAGEM</span>
             <span>FICHA DE AGENTE</span>
           </footer>
         </section>
@@ -1600,7 +1591,7 @@
           </label>
 
           <footer class="sheet-footer">
-            <span>PAGINA 5 - PROTOCOLO MIRAGEM</span>
+            <span>PÁGINA 5 - PROTOCOLO MIRAGEM</span>
             <span>FICHA DE AGENTE</span>
           </footer>
         </section>

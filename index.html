@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Protocolo Miragem - Arquivos</title>
-    <link rel="stylesheet" href="style2.css" />
+    <link rel="stylesheet" href="style2.css?v=4" />
   </head>
   <body>
     <div id="app-container">
@@ -110,13 +110,44 @@
     <div id="escudo-mestre-overlay" class="hidden">
       <div class="escudo-mestre-header">
         <h2>🛡️ ESCUDO DO MESTRE</h2>
-        <button id="btn-close-escudo" class="btn-dark" style="background: #333">
-          Fechar ❌
-        </button>
+        <div style="display: flex; gap: 10px;">
+          <button id="btn-show-sucessos" class="btn-dark" style="background: #25282c; border-color: #444;">📋 Tabela de Sucessos</button>
+          <button id="btn-show-notas" class="btn-dark" style="background: #25282c; border-color: #444;">📝 Notas do Mestre</button>
+          <button id="btn-close-escudo" class="btn-dark" style="background: #333">Fechar ❌</button>
+        </div>
       </div>
       <div id="escudo-mestre-content" class="agents-grid"></div>
+      <div class="escudo-iniciativa-section">
+        <h3>⚔️ INICIATIVA</h3>
+        <textarea id="escudo-mestre-iniciativa" placeholder="Escreva a iniciativa de todos aqui (agentes e monstros)..."></textarea>
+      </div>
     </div>
 
-    <script type="module" src="script.js?v=9"></script>
+    <!-- MODAL TABELA DE SUCESSOS (DENTRO DO ESCUDO) -->
+    <div id="escudo-sucessos-modal" class="hidden escudo-sub-modal">
+      <div class="escudo-sub-modal-content">
+        <div class="escudo-sub-modal-header">
+          <h3>📋 Tabela de Sucessos</h3>
+          <button id="btn-close-sucessos" class="btn-dark">Fechar ❌</button>
+        </div>
+        <div id="escudo-tabela-sucessos" class="success-table-wrap"></div>
+        <p class="table-legend" style="font-size: 11px; margin-top: 10px; text-align: left; line-height: 1.4;">
+          R = Rolamento / V = Valor / C = Falha Crítica / F = Falha / S = Sucesso Normal / B = Sucesso Bom / E = Sucesso Extremo
+        </p>
+      </div>
+    </div>
+
+    <!-- MODAL NOTAS DO MESTRE (DENTRO DO ESCUDO) -->
+    <div id="escudo-notas-modal" class="hidden escudo-sub-modal">
+      <div class="escudo-sub-modal-content">
+        <div class="escudo-sub-modal-header">
+          <h3>📝 Notas do Mestre</h3>
+          <button id="btn-close-notas" class="btn-dark">Fechar ❌</button>
+        </div>
+        <textarea id="escudo-mestre-notas" placeholder="A carregar notas do Firebase..."></textarea>
+      </div>
+    </div>
+
+    <script type="module" src="script.js?v=12"></script>
   </body>
 </html>
