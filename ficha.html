@@ -4,9 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ficha do Agente - Protocolo Miragem</title>
-    <link rel="stylesheet" href="style.css?v=9" />
+    <link rel="stylesheet" href="style.css?v=16" />
   </head>
   <body class="ficha-body">
+    <!-- Botão Flutuante de Modo Escuro Minimalista -->
+    <div style="position: fixed; top: 15px; right: 15px; z-index: 9999;">
+      <button type="button" id="btn-dark-mode" style="background: transparent; border: none; font-size: 20px; cursor: pointer; padding: 8px; opacity: 0.7; transition: opacity 0.2s; outline: none;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+        🌙
+      </button>
+    </div>
+
     <main class="sheet-wrap" style="margin-top: 40px">
       <form id="form-ficha" onsubmit="return false;">
         <section class="sheet-page page-one">
@@ -1441,10 +1448,10 @@
                 />
               </div>
             </div>
-            <label class="boxed-area personality-box">
+            <div class="boxed-area personality-box">
               <span>PERSONALIDADE E OBJETIVOS</span>
-              <textarea id="perfil-personalidade" rows="8"></textarea>
-            </label>
+              <div id="perfil-personalidade" contenteditable="true" class="editor-editable"></div>
+            </div>
             <div class="boxed-area trauma-box">
               <span>PAINEL CLÍNICO (FOBIAS & FERIMENTOS)</span>
               <div id="traumas-clinicos-container" class="interactive-container"></div>
@@ -1452,6 +1459,7 @@
                 <button type="button" id="btn-add-fobia" class="interactive-add-btn" style="margin-top:0;">+ Fobia/Mania</button>
                 <button type="button" id="btn-add-ferimento" class="interactive-add-btn" style="margin-top:0;">+ Ferimento Grave</button>
               </div>
+            </div>
             </div>
           </div>
 
@@ -1513,13 +1521,13 @@
         </section>
 
         <section class="sheet-page page-four">
-          <label class="boxed-area attacks-box">
+          <div class="boxed-area attacks-box">
             <span>DESCRIÇÃO DOS EQUIPAMENTOS E ATAQUES:</span>
-            <textarea id="inventario-descricao" rows="10"></textarea>
-          </label>
+            <div id="inventario-descricao" contenteditable="true" class="editor-editable"></div>
+          </div>
 
           <div class="combat-strip">
-            <label><span>RD:</span><textarea id="combate-rd" placeholder="RD..."></textarea></label>
+            <label><span>RD:</span><div id="combate-rd" contenteditable="true" class="editor-editable" style="border:0; background:transparent; height:100%; width:100%;"></div></label>
             <label
               ><span>DEFESA:</span><input type="text" id="combate-defesa"
             /></label>
@@ -1535,10 +1543,10 @@
                 <button type="button" id="btn-add-poder" class="interactive-add-btn" style="margin-top:0;">+ Poder</button>
               </div>
             </div>
-            <label class="boxed-area corruption-box">
+            <div class="boxed-area corruption-box">
               <span>TRANSFORMAÇÕES POR CORRUPÇÃO</span>
-              <textarea id="habilidades-transformacoes" rows="12"></textarea>
-            </label>
+              <div id="habilidades-transformacoes" contenteditable="true" class="editor-editable"></div>
+            </div>
             <div class="boxed-area mark-box">
               <span>MARCA</span>
               <input
@@ -1601,10 +1609,10 @@
         </section>
 
         <section class="sheet-page page-five">
-          <label class="boxed-area notes-box">
+          <div class="boxed-area notes-box">
             <span>NOTAS</span>
-            <textarea id="perfil-notas"></textarea>
-          </label>
+            <div id="perfil-notas" contenteditable="true" class="editor-editable"></div>
+          </div>
 
           <footer class="sheet-footer">
             <span>PÁGINA 5 - PROTOCOLO MIRAGEM</span>
@@ -1659,6 +1667,6 @@
       </div>
     </div>
 
-    <script type="module" src="script.js?v=14"></script>
+    <script type="module" src="script.js?v=16"></script>
   </body>
 </html>
