@@ -1321,19 +1321,19 @@ if (formFicha) {
   const floatingBtn = document.createElement("button");
   floatingBtn.type = "button";
   floatingBtn.id = "floating-highlight-btn";
-  floatingBtn.innerHTML = "✏️ Destacar";
+  floatingBtn.innerHTML = "<b>B</b> Negrito";
   floatingBtn.style.position = "fixed";
   floatingBtn.style.display = "none";
   floatingBtn.style.zIndex = "10000";
-  floatingBtn.style.background = "#f7e03b";
-  floatingBtn.style.color = "#000";
-  floatingBtn.style.border = "1px solid #151515";
+  floatingBtn.style.background = "var(--paper)";
+  floatingBtn.style.color = "var(--ink)";
+  floatingBtn.style.border = "2px solid var(--line)";
   floatingBtn.style.borderRadius = "4px";
-  floatingBtn.style.padding = "4px 8px";
+  floatingBtn.style.padding = "4px 10px";
   floatingBtn.style.fontSize = "12px";
   floatingBtn.style.fontWeight = "bold";
   floatingBtn.style.cursor = "pointer";
-  floatingBtn.style.boxShadow = "0 2px 5px rgba(0,0,0,0.3)";
+  floatingBtn.style.boxShadow = "0 4px 6px rgba(0,0,0,0.15)";
   document.body.appendChild(floatingBtn);
 
   // Monitora alterações de seleção no documento
@@ -1373,8 +1373,8 @@ if (formFicha) {
     e.preventDefault();
     e.stopPropagation();
 
-    // Aplica a cor de fundo amarela de destaque
-    document.execCommand("backColor", false, "#f7e03b");
+    // Aplica negrito (alterna se já estiver negrito)
+    document.execCommand("bold", false, null);
 
     // Encontra o editor ativo para disparar o evento input e salvar no banco de dados
     const selection = window.getSelection();
@@ -1405,7 +1405,7 @@ if (formFicha) {
         activeEl.getAttribute("contenteditable") === "true"
       ) {
         e.preventDefault();
-        document.execCommand("backColor", false, "#f7e03b");
+        document.execCommand("bold", false, null);
         activeEl.dispatchEvent(new Event("input", { bubbles: true }));
       }
     }
