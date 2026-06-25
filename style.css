@@ -757,6 +757,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .boxed-area {
   display: grid;
+  grid-template-rows: auto 1fr;
   gap: 10px;
 }
 
@@ -764,6 +765,12 @@ input[type="number"]::-webkit-outer-spin-button {
   display: block;
   text-align: center;
   font-size: 21px;
+}
+
+.boxed-area textarea,
+.boxed-area #foto-container,
+.boxed-area #marca-container {
+  height: 100%;
 }
 
 .boxed-area textarea {
@@ -820,7 +827,8 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .resource-line input,
-.combat-strip input {
+.combat-strip input,
+.combat-strip textarea {
   height: 100%;
   border: 0;
 }
@@ -846,7 +854,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .load-matrix {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   border-top: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.6);
 }
@@ -1046,3 +1054,165 @@ input[type="number"]::-webkit-outer-spin-button {
     min-width: 500px;
   }
 }
+
+/* ==========================================
+   MODO ESCURO / DARK THEME (PM SYSTEM)
+   ========================================== */
+body.dark-theme {
+  --ink: #fbfbf8;
+  --paper: #161616;
+  --paper-soft: #242424;
+  --panel: #2d2d2d;
+  --line: #444444;
+  --muted: #a0a0a0;
+  --focus: #4b92db;
+  background:
+    radial-gradient(
+        circle at 1px 1px,
+        rgba(255, 255, 255, 0.05) 1px,
+        transparent 1.5px
+      )
+      0 0 / 10px 14px,
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.02) 0 1px,
+      transparent 1px 7px
+    ),
+    #121212;
+}
+
+body.dark-theme .sheet-page {
+  background: 
+    linear-gradient(rgba(20, 20, 20, 0.94), rgba(20, 20, 20, 0.94)),
+    url("fundo.png") center/cover no-repeat;
+  box-shadow: 8px 8px 0 rgba(255, 255, 255, 0.08);
+}
+
+body.dark-theme input,
+body.dark-theme textarea,
+body.dark-theme select {
+  background: rgba(30, 30, 30, 0.88);
+  color: var(--ink);
+}
+
+body.dark-theme .btn-secondary {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+body.dark-theme .btn-secondary:hover {
+  background: var(--panel);
+}
+
+body.dark-theme .dashboard-main,
+body.dark-theme .new-agent-panel {
+  background:
+    linear-gradient(rgba(30, 30, 30, 0.92), rgba(30, 30, 30, 0.92)),
+    radial-gradient(
+        circle at 1px 1px,
+        rgba(255, 255, 255, 0.04) 1px,
+        transparent 1.5px
+      )
+      0 0 / 9px 13px,
+    var(--paper);
+  border-color: var(--line);
+  box-shadow: 6px 6px 0 rgba(255, 255, 255, 0.08);
+}
+
+body.dark-theme #lista-personagens > div {
+  border-color: var(--line);
+  background: rgba(30, 30, 30, 0.8);
+}
+
+body.dark-theme .level-table,
+body.dark-theme .status-box,
+body.dark-theme .gc-box {
+  background: rgba(30, 30, 30, 0.58);
+}
+
+body.dark-theme .status-box input,
+body.dark-theme .gc-box input,
+body.dark-theme .level-fields input,
+body.dark-theme .load-box input {
+  background: transparent;
+}
+
+body.dark-theme .label-col,
+body.dark-theme .total-box {
+  background: #2d2d2d;
+}
+
+body.dark-theme .skill-column {
+  background: rgba(30, 30, 30, 0.54);
+}
+
+body.dark-theme .checkbox-pericia {
+  background: rgba(40, 40, 40, 0.65);
+}
+
+body.dark-theme .input-base-fixa {
+  background: #262626;
+  color: #888;
+}
+
+body.dark-theme .load-matrix {
+  background: rgba(30, 30, 30, 0.6);
+}
+
+body.dark-theme .combat-strip {
+  background: rgba(30, 30, 30, 0.7);
+}
+
+body.dark-theme .attribute-web {
+  filter: invert(0.9) hue-rotate(180deg);
+}
+
+body.dark-theme .axis {
+  background: #3a3a3a;
+}
+
+/* ==========================================
+   EDITABLE DIVS & HIGHLIGHTING (PM SYSTEM)
+   ========================================== */
+.editor-editable {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--ink);
+  outline: none;
+  overflow-y: auto;
+  word-wrap: break-word;
+  white-space: pre-wrap; /* Preserva quebras de linha e espaços */
+  padding: 8px;
+  line-height: 1.35;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: inherit;
+}
+
+body.dark-theme .editor-editable {
+  background: rgba(30, 30, 30, 0.88);
+  color: var(--ink);
+}
+
+.boxed-area .editor-editable {
+  border: 3px solid var(--line);
+  background: rgba(255, 255, 255, 0.48);
+  height: 100%;
+}
+
+body.dark-theme .boxed-area .editor-editable {
+  background: rgba(30, 30, 30, 0.58);
+}
+
+.personality-box .editor-editable { min-height: 180px; }
+.trauma-box .editor-editable { min-height: 150px; }
+.equipment-box .editor-editable { min-height: 220px; }
+.goods-box .editor-editable { min-height: 220px; }
+.attacks-box .editor-editable { min-height: 220px; }
+.abilities-box .editor-editable { min-height: 420px; }
+.corruption-box .editor-editable { min-height: 260px; }
+.rituals-box .editor-editable { min-height: 260px; }
+.notes-box .editor-editable { min-height: 290px; }

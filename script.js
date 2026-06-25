@@ -150,9 +150,7 @@ function criarAgenteEmBranco(nomeInicial) {
       ciencia2: 0,
       ciencia2_base: 0,
       ciencia2_espec: "",
-      ciencia3: 0,
-      ciencia3_base: 0,
-      ciencia3_espec: "",
+
       computador: 15,
       computador_base: 15,
       credito: 0,
@@ -169,6 +167,8 @@ function criarAgenteEmBranco(nomeInicial) {
       lembrar_base: 25,
       medicina: 1,
       medicina_base: 1,
+      religiao: 5,
+      religiao_base: 5,
       reparos_eletricos: 0,
       reparos_eletricos_base: 0,
       reparos_mecanicos: 0,
@@ -567,10 +567,122 @@ const escudoMestreContent = document.getElementById("escudo-mestre-content");
 if (btnEscudoMestre && escudoMestreOverlay && btnCloseEscudo) {
   btnEscudoMestre.addEventListener("click", () => {
     escudoMestreOverlay.classList.remove("hidden");
+    carregarIniciativaMestre();
   });
   btnCloseEscudo.addEventListener("click", () => {
     escudoMestreOverlay.classList.add("hidden");
+    const sucessosModal = document.getElementById("escudo-sucessos-modal");
+    const notasModal = document.getElementById("escudo-notas-modal");
+    if (sucessosModal) sucessosModal.classList.add("hidden");
+    if (notasModal) notasModal.classList.add("hidden");
   });
+
+  // Configuração dos Sub-Modais (Tabela de Sucessos e Notas)
+  const btnShowSucessos = document.getElementById("btn-show-sucessos");
+  const btnCloseSucessos = document.getElementById("btn-close-sucessos");
+  const btnShowNotas = document.getElementById("btn-show-notas");
+  const btnCloseNotas = document.getElementById("btn-close-notas");
+  const sucessosModal = document.getElementById("escudo-sucessos-modal");
+  const notasModal = document.getElementById("escudo-notas-modal");
+
+  if (btnShowSucessos && sucessosModal) {
+    btnShowSucessos.addEventListener("click", () => {
+      sucessosModal.classList.remove("hidden");
+      desenharTabelaSucessosEscudo();
+    });
+  }
+  if (btnCloseSucessos && sucessosModal) {
+    btnCloseSucessos.addEventListener("click", () => {
+      sucessosModal.classList.add("hidden");
+    });
+  }
+
+  if (btnShowNotas && notasModal) {
+    btnShowNotas.addEventListener("click", () => {
+      notasModal.classList.remove("hidden");
+      carregarNotasMestre();
+    });
+  }
+  if (btnCloseNotas && notasModal) {
+    btnCloseNotas.addEventListener("click", () => {
+      notasModal.classList.add("hidden");
+    });
+  }
+}
+
+function desenharTabelaSucessosEscudo() {
+  const tabelaDiv = document.getElementById("escudo-tabela-sucessos");
+  if (!tabelaDiv || tabelaDiv.children.length > 0) return; // Já desenhada
+
+  let html = '<table class="success-table"><thead><tr><th class="axis">V \\ R</th>';
+  for (let r = 1; r <= 20; r++) html += `<th>${r}</th>`;
+  html += "</tr></thead><tbody>";
+  for (let v = 1; v <= 20; v++) {
+    html += `<tr><th class="axis">${v}</th>`;
+    for (let r = 1; r <= 20; r++) {
+      const fc = (v < 10 && r >= 19) || (v >= 10 && r === 20);
+      let c = "success-falha",
+        l = "F";
+      if (fc) {
+        c = "success-critica";
+        l = "C";
+      } else if (r <= Math.floor(v / 5)) {
+        c = "success-extremo";
+        l = "E";
+      } else if (r <= Math.floor(v / 2)) {
+        c = "success-bom";
+        l = "B";
+      } else if (r <= v) {
+        c = "success-normal";
+        l = "S";
+      }
+      html += `<td class="${c}">${l}</td>`;
+    }
+    html += `</tr>`;
+  }
+  html += "</tbody></table>";
+  tabelaDiv.innerHTML = html;
+}
+
+async function carregarNotasMestre() {
+  const notasTextarea = document.getElementById("escudo-mestre-notas");
+  if (!notasTextarea || !currentCampaignId) return;
+
+  notasTextarea.disabled = true;
+  notasTextarea.placeholder = "A carregar notas do Firebase...";
+
+  try {
+    const docRef = doc(db, "campaigns", currentCampaignId);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      notasTextarea.value = data.notasMestre || "";
+    } else {
+      notasTextarea.value = "";
+    }
+  } catch (error) {
+    console.error("Erro ao carregar notas do Firebase:", error);
+  } finally {
+    notasTextarea.disabled = false;
+    notasTextarea.placeholder = "Escreva as suas anotações da campanha aqui... (Salvo automaticamente no Firebase)";
+  }
+
+  // Setup de salvamento automático com "debounce" de 1,5s
+  let timeoutSalvarNotas;
+  notasTextarea.oninput = (e) => {
+    clearTimeout(timeoutSalvarNotas);
+    timeoutSalvarNotas = setTimeout(async () => {
+      try {
+        const docRef = doc(db, "campaigns", currentCampaignId);
+        await updateDoc(docRef, {
+          notasMestre: e.target.value,
+        });
+      } catch (error) {
+        console.error("Erro ao salvar notas no Firebase:", error);
+      }
+    }, 1500);
+  };
 }
 
 async function renderizarListaAgentes() {
@@ -712,6 +824,48 @@ async function renderizarListaAgentes() {
   }
 }
 
+async function carregarIniciativaMestre() {
+  const iniciativaTextarea = document.getElementById("escudo-mestre-iniciativa");
+  if (!iniciativaTextarea || !currentCampaignId) return;
+
+  iniciativaTextarea.disabled = true;
+  iniciativaTextarea.placeholder = "A carregar iniciativa...";
+
+  try {
+    const docRef = doc(db, "campaigns", currentCampaignId);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      iniciativaTextarea.value = data.iniciativaMestre || "";
+    } else {
+      iniciativaTextarea.value = "";
+    }
+  } catch (error) {
+    console.error("Erro ao carregar iniciativa do Firebase:", error);
+  } finally {
+    iniciativaTextarea.disabled = false;
+    iniciativaTextarea.placeholder = "Escreva a iniciativa de todos aqui (agentes e monstros)...";
+  }
+
+  let timeoutSalvarIniciativa;
+  iniciativaTextarea.oninput = (e) => {
+    clearTimeout(timeoutSalvarIniciativa);
+    timeoutSalvarIniciativa = setTimeout(async () => {
+      try {
+        const docRef = doc(db, "campaigns", currentCampaignId);
+        await updateDoc(docRef, {
+          iniciativaMestre: e.target.value
+        });
+      } catch (error) {
+        console.error("Erro ao salvar iniciativa no Firebase:", error);
+      }
+    }, 1500);
+  };
+}
+
+
+
 if (listaDiv && btnNovo) {
   btnNovo.addEventListener("click", async () => {
     const nome = inputNovoNome.value.trim();
@@ -749,6 +903,38 @@ if (formFicha) {
   let agenteAtual = null;
   let pendingUpdates = {};
   let saveTimeoutFicha;
+
+  // Lógica de Modo Escuro
+  const btnDarkMode = document.getElementById("btn-dark-mode");
+  
+  function aplicarTema(tema) {
+    if (tema === "dark") {
+      document.body.classList.add("dark-theme");
+      if (btnDarkMode) btnDarkMode.innerHTML = "☀️";
+    } else {
+      document.body.classList.remove("dark-theme");
+      if (btnDarkMode) btnDarkMode.innerHTML = "🌙";
+    }
+  }
+
+  // Verificar preferência anterior
+  const temaSalvo = localStorage.getItem("theme");
+  if (temaSalvo) {
+    aplicarTema(temaSalvo);
+  } else {
+    // Verificar preferência do sistema
+    const prefEscuro = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    aplicarTema(prefEscuro ? "dark" : "light");
+  }
+
+  if (btnDarkMode) {
+    btnDarkMode.addEventListener("click", () => {
+      const eEscuro = document.body.classList.contains("dark-theme");
+      const novoTema = eEscuro ? "light" : "dark";
+      aplicarTema(novoTema);
+      localStorage.setItem("theme", novoTema);
+    });
+  }
 
   function atualizarCampoDebounced(categoria, chave, valor) {
     pendingUpdates[`${categoria}.${chave}`] = valor;
@@ -828,6 +1014,14 @@ if (formFicha) {
               const valorBooleano = !!agenteAtual[categoria][chave];
               if (campo.checked !== valorBooleano) {
                 campo.checked = valorBooleano;
+              }
+            } else if (campo.tagName === "TEXTAREA") {
+              const val = agenteAtual[categoria][chave];
+              const stringVal = Array.isArray(val)
+                ? val.map(item => typeof item === 'object' ? (item.nome || "") : item).filter(Boolean).join(", ")
+                : (val || "");
+              if (campo.value != stringVal) {
+                campo.value = stringVal;
               }
             } else if (
               agenteAtual[categoria][chave] !== undefined &&
