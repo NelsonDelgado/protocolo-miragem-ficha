@@ -455,6 +455,73 @@ body {
   z-index: 2;
 }
 
+.mc-bar-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 5px;
+  width: 100%;
+}
+
+.mc-ctrl-btn {
+  background: #25282c;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 3px 7px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+}
+
+.mc-ctrl-btn:hover {
+  background: #3a3f46;
+  border-color: #666;
+}
+
+.mc-ctrl-btn:active {
+  transform: scale(0.95);
+}
+
+.mc-ctrl-btn.pv-sub:hover, .mc-ctrl-btn.pv-sub-big:hover {
+  background: #601818;
+  border-color: #cc4444;
+}
+
+.mc-ctrl-btn.pv-add:hover, .mc-ctrl-btn.pv-add-big:hover {
+  background: #1b5e28;
+  border-color: #38aa48;
+}
+
+.mc-ctrl-btn.pd-sub:hover, .mc-ctrl-btn.pd-sub-big:hover {
+  background: #543208;
+  border-color: #bb7711;
+}
+
+.mc-ctrl-btn.pd-add:hover, .mc-ctrl-btn.pd-add-big:hover {
+  background: #0f526e;
+  border-color: #22a2d4;
+}
+
+.mc-ctrl-input {
+  width: 52px;
+  text-align: center;
+  background: #111;
+  color: #fff;
+  border: 1px solid #444;
+  border-radius: 3px;
+  padding: 3px 2px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.mc-ctrl-input:focus {
+  border-color: #4b92db;
+  outline: none;
+}
+
 .mc-combat {
   display: flex;
   justify-content: space-around;

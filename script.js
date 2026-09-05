@@ -47,6 +47,37 @@ let currentCampaignId = null;
 let isCurrentUserMaster = false;
 let masterCampaignsUnsubscribe = null;
 let playerCampaignsUnsubscribe = null;
+let agentesUnsubscribe = null;
+let campanhaDadosUnsubscribe = null;
+const cacheAgentesCampanha = new Map();
+
+function atualizarUrlEstado(campaignId, escudoAberto) {
+  if (typeof window === "undefined" || !window.history) return;
+  const url = new URL(window.location);
+  if (campaignId) {
+    url.searchParams.set("campaign", campaignId);
+  } else {
+    url.searchParams.delete("campaign");
+  }
+  if (escudoAberto) {
+    url.searchParams.set("escudo", "true");
+  } else {
+    url.searchParams.delete("escudo");
+  }
+  window.history.replaceState({}, "", url);
+}
+
+function pararOuvintesCampanha() {
+  if (agentesUnsubscribe) {
+    agentesUnsubscribe();
+    agentesUnsubscribe = null;
+  }
+  if (campanhaDadosUnsubscribe) {
+    campanhaDadosUnsubscribe();
+    campanhaDadosUnsubscribe = null;
+  }
+  cacheAgentesCampanha.clear();
+}
 
 // Sistema de "Debounce" para não estourar os limites gratuitos de banco de dados
 let saveTimeout;
@@ -284,7 +315,7 @@ async function migrarDadosAntigosParaFirebase() {
 
 if (loginView) {
   // Observador do estado de autenticação
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, async (user) => {
     if (user) {
       currentUser = user;
       loginView.classList.add("hidden");
@@ -292,14 +323,49 @@ if (loginView) {
       userEmailEl.textContent = user.displayName || user.email;
 
       // Corre o migrador primeiro, e só depois liga os ouvintes da campanha
-      migrarDadosAntigosParaFirebase().then(() => {
-        setupCampaignListeners();
-      });
+      await migrarDadosAntigosParaFirebase();
+      setupCampaignListeners();
+
+      // Restaura o estado a partir da URL se a página foi atualizada (refresh)
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlCampaignId = urlParams.get("campaign");
+      const urlEscudo = urlParams.get("escudo") === "true";
+
+      if (urlCampaignId) {
+        try {
+          const campSnap = await getDoc(doc(db, "campaigns", urlCampaignId));
+          if (campSnap.exists()) {
+            const campData = campSnap.data();
+            const isMaster = campData.masterId === user.uid;
+            const isPlayer =
+              Array.isArray(campData.playerIds) &&
+              campData.playerIds.includes(user.uid);
+
+            if (isMaster || isPlayer) {
+              if (window.abrirCampanha) {
+                window.abrirCampanha(urlCampaignId, isMaster);
+              }
+              if (isMaster && urlEscudo && window.abrirEscudoMestre) {
+                window.abrirEscudoMestre();
+              }
+            } else {
+              atualizarUrlEstado(null, false);
+            }
+          } else {
+            atualizarUrlEstado(null, false);
+          }
+        } catch (e) {
+          console.error("Erro ao restaurar campanha da URL:", e);
+          atualizarUrlEstado(null, false);
+        }
+      }
     } else {
       currentUser = null;
       loginView.classList.remove("hidden");
       dashboardView.classList.add("hidden");
+      pararOuvintesCampanha();
       unsubscribeCampaignListeners();
+      atualizarUrlEstado(null, false);
     }
   });
 
@@ -485,10 +551,13 @@ if (campaignDashboard) {
   });
 
   btnBackToCampaigns.addEventListener("click", () => {
+    pararOuvintesCampanha();
+    if (window.fecharEscudoMestre) window.fecharEscudoMestre();
     agentsView.classList.add("hidden");
     campaignDashboard.classList.remove("hidden");
     currentCampaignId = null;
     isCurrentUserMaster = false;
+    atualizarUrlEstado(null, false);
   });
 
   window.abrirCampanha = (campaignId, isMaster) => {
@@ -496,7 +565,11 @@ if (campaignDashboard) {
     isCurrentUserMaster = isMaster;
     if (agentsView) agentsView.classList.remove("hidden");
     if (campaignDashboard) campaignDashboard.classList.add("hidden");
-    renderizarListaAgentes();
+    atualizarUrlEstado(campaignId, false);
+    iniciarOuvinteAgentes();
+    if (isMaster) {
+      iniciarOuvinteDadosCampanha();
+    }
   };
 
   window.deletarCampanha = async (campaignId) => {
@@ -527,16 +600,28 @@ const btnCloseEscudo = document.getElementById("btn-close-escudo");
 const escudoMestreContent = document.getElementById("escudo-mestre-content");
 
 if (btnEscudoMestre && escudoMestreOverlay && btnCloseEscudo) {
-  btnEscudoMestre.addEventListener("click", () => {
+  window.abrirEscudoMestre = () => {
+    if (!isCurrentUserMaster) return;
     escudoMestreOverlay.classList.remove("hidden");
-    carregarIniciativaMestre();
-  });
-  btnCloseEscudo.addEventListener("click", () => {
+    atualizarUrlEstado(currentCampaignId, true);
+  };
+
+  window.fecharEscudoMestre = () => {
     escudoMestreOverlay.classList.add("hidden");
     const sucessosModal = document.getElementById("escudo-sucessos-modal");
     const notasModal = document.getElementById("escudo-notas-modal");
     if (sucessosModal) sucessosModal.classList.add("hidden");
     if (notasModal) notasModal.classList.add("hidden");
+    if (currentCampaignId) {
+      atualizarUrlEstado(currentCampaignId, false);
+    }
+  };
+
+  btnEscudoMestre.addEventListener("click", () => {
+    window.abrirEscudoMestre();
+  });
+  btnCloseEscudo.addEventListener("click", () => {
+    window.fecharEscudoMestre();
   });
 
   // Configuração dos Sub-Modais (Tabela de Sucessos e Notas)
@@ -562,7 +647,6 @@ if (btnEscudoMestre && escudoMestreOverlay && btnCloseEscudo) {
   if (btnShowNotas && notasModal) {
     btnShowNotas.addEventListener("click", () => {
       notasModal.classList.remove("hidden");
-      carregarNotasMestre();
     });
   }
   if (btnCloseNotas && notasModal) {
@@ -606,133 +690,201 @@ function desenharTabelaSucessosEscudo() {
   tabelaDiv.innerHTML = html;
 }
 
-async function carregarNotasMestre() {
-  const notasTextarea = document.getElementById("escudo-mestre-notas");
-  if (!notasTextarea || !currentCampaignId) return;
-
-  notasTextarea.disabled = true;
-  notasTextarea.placeholder = "A carregar notas do Firebase...";
-
-  try {
-    const docRef = doc(db, "campaigns", currentCampaignId);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      notasTextarea.value = data.notasMestre || "";
-    } else {
-      notasTextarea.value = "";
-    }
-  } catch (error) {
-    console.error("Erro ao carregar notas do Firebase:", error);
-  } finally {
-    notasTextarea.disabled = false;
-    notasTextarea.placeholder = "Escreva as suas anotações da campanha aqui... (Salvo automaticamente no Firebase)";
+function iniciarOuvinteDadosCampanha() {
+  if (!currentCampaignId) return;
+  if (campanhaDadosUnsubscribe) {
+    campanhaDadosUnsubscribe();
+    campanhaDadosUnsubscribe = null;
   }
 
-  // Setup de salvamento automático com "debounce" de 1,5s
-  let timeoutSalvarNotas;
-  notasTextarea.oninput = (e) => {
-    clearTimeout(timeoutSalvarNotas);
-    timeoutSalvarNotas = setTimeout(async () => {
-      try {
-        const docRef = doc(db, "campaigns", currentCampaignId);
-        await updateDoc(docRef, {
-          notasMestre: e.target.value,
-        });
-      } catch (error) {
-        console.error("Erro ao salvar notas no Firebase:", error);
+  const iniciativaTextarea = document.getElementById("escudo-mestre-iniciativa");
+  const notasTextarea = document.getElementById("escudo-mestre-notas");
+
+  if (iniciativaTextarea) {
+    let timeoutSalvarIniciativa;
+    iniciativaTextarea.oninput = (e) => {
+      clearTimeout(timeoutSalvarIniciativa);
+      const val = e.target.value;
+      timeoutSalvarIniciativa = setTimeout(async () => {
+        if (!currentCampaignId) return;
+        try {
+          await updateDoc(doc(db, "campaigns", currentCampaignId), {
+            iniciativaMestre: val,
+          });
+        } catch (error) {
+          console.error("Erro ao salvar iniciativa no Firebase:", error);
+        }
+      }, 1000);
+    };
+  }
+
+  if (notasTextarea) {
+    let timeoutSalvarNotas;
+    notasTextarea.oninput = (e) => {
+      clearTimeout(timeoutSalvarNotas);
+      const val = e.target.value;
+      timeoutSalvarNotas = setTimeout(async () => {
+        if (!currentCampaignId) return;
+        try {
+          await updateDoc(doc(db, "campaigns", currentCampaignId), {
+            notasMestre: val,
+          });
+        } catch (error) {
+          console.error("Erro ao salvar notas no Firebase:", error);
+        }
+      }, 1000);
+    };
+  }
+
+  campanhaDadosUnsubscribe = onSnapshot(
+    doc(db, "campaigns", currentCampaignId),
+    (docSnap) => {
+      if (!docSnap.exists()) return;
+      const data = docSnap.data();
+
+      if (iniciativaTextarea && document.activeElement !== iniciativaTextarea) {
+        iniciativaTextarea.value = data.iniciativaMestre || "";
       }
-    }, 1500);
-  };
+      if (notasTextarea && document.activeElement !== notasTextarea) {
+        notasTextarea.value = data.notasMestre || "";
+      }
+    },
+    (error) => {
+      console.error("Erro no ouvinte de dados da campanha:", error);
+    },
+  );
 }
 
-async function renderizarListaAgentes() {
+function iniciarOuvinteAgentes() {
   if (!currentCampaignId || !listaDiv) return;
+  if (agentesUnsubscribe) {
+    agentesUnsubscribe();
+    agentesUnsubscribe = null;
+  }
+
   listaDiv.innerHTML = `<p style="color:#aaa; text-align:center;">A carregar agentes...</p>`;
 
-  try {
-    const q = query(
-      collection(db, "agentes"),
-      where("campaignId", "==", currentCampaignId),
-    );
+  const q = query(
+    collection(db, "agentes"),
+    where("campaignId", "==", currentCampaignId),
+  );
 
-    const querySnapshot = await getDocs(q);
+  agentesUnsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
+      cacheAgentesCampanha.clear();
+      snapshot.forEach((docSnap) => {
+        cacheAgentesCampanha.set(docSnap.id, {
+          docId: docSnap.id,
+          ...docSnap.data(),
+        });
+      });
+      renderizarUiAgentes();
+    },
+    (error) => {
+      console.error("Erro ao carregar lista de agentes em tempo real:", error);
+      listaDiv.innerHTML = `<p style="color:red; text-align:center;">Erro de permissões ao carregar fichas.</p>`;
+    },
+  );
+}
 
+function renderizarUiAgentes() {
+  if (!listaDiv) return;
+
+  if (btnEscudoMestre) {
+    if (isCurrentUserMaster) btnEscudoMestre.classList.remove("hidden");
+    else btnEscudoMestre.classList.add("hidden");
+  }
+
+  if (cacheAgentesCampanha.size === 0) {
     listaDiv.className = "agents-grid";
-    listaDiv.innerHTML = "";
-
-    if (querySnapshot.empty) {
-      listaDiv.innerHTML = `<p style="color:#aaa; text-align:center;">Nenhum agente registrado nesta campanha.</p>`;
-      if (escudoMestreContent) escudoMestreContent.innerHTML = "";
-      return;
+    listaDiv.innerHTML = `<p style="color:#aaa; text-align:center;">Nenhum agente registrado nesta campanha.</p>`;
+    if (escudoMestreContent) {
+      escudoMestreContent.innerHTML = `<p style="color:#aaa; text-align:center; width:100%;">Nenhum agente registrado nesta campanha.</p>`;
     }
+    return;
+  }
 
-    if (btnEscudoMestre) {
-      if (isCurrentUserMaster) btnEscudoMestre.classList.remove("hidden");
-      else btnEscudoMestre.classList.add("hidden");
-    }
+  // Memoriza qual input de PV/PD estava focado para não interromper a digitação do mestre
+  const focusedId =
+    document.activeElement &&
+    document.activeElement.id &&
+    document.activeElement.id.startsWith("mc-input-")
+      ? document.activeElement.id
+      : null;
+  const selStart = focusedId ? document.activeElement.selectionStart : null;
+  const selEnd = focusedId ? document.activeElement.selectionEnd : null;
 
-    if (escudoMestreContent) escudoMestreContent.innerHTML = "";
+  // 1. Renderiza lista de agentes normal na tela da campanha
+  listaDiv.className = "agents-grid";
+  listaDiv.innerHTML = "";
 
-    querySnapshot.forEach((docSnap) => {
-      const agente = docSnap.data();
-      const wrapper = document.createElement("div");
-      wrapper.className = "agent-card";
+  cacheAgentesCampanha.forEach((agente, agenteDocId) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "agent-card";
 
-      const isOwner = agente.userId === currentUser.uid;
-      const canEdit = isOwner || isCurrentUserMaster;
+    const isOwner = currentUser && agente.userId === currentUser.uid;
+    const canEdit = isOwner || isCurrentUserMaster;
 
-      const fotoHtml =
-        agente.perfil && agente.perfil.foto_img
-          ? `<img src="${agente.perfil.foto_img}" alt="Foto de ${agente.identidade.nome}">`
-          : `<div style="color: #666; font-size: 11px; text-transform: uppercase; text-align: center; padding: 10px;">Sem Foto</div>`;
+    const fotoHtml =
+      agente.perfil && agente.perfil.foto_img
+        ? `<img src="${agente.perfil.foto_img}" alt="Foto de ${agente.identidade ? agente.identidade.nome : 'Agente'}">`
+        : `<div style="color: #666; font-size: 11px; text-transform: uppercase; text-align: center; padding: 10px;">Sem Foto</div>`;
 
-      const deleteButtonHtml = canEdit
-        ? `<button class="agent-card-settings" onclick="deletarPersonagem('${agente.id}')" title="Apagar Agente">⚙️</button>`
-        : "";
+    const deleteButtonHtml = canEdit
+      ? `<button class="agent-card-settings" onclick="deletarPersonagem('${agenteDocId}')" title="Apagar Agente">⚙️</button>`
+      : "";
 
-      const acessarButtonHtml = canEdit
-        ? `<button class="agent-card-btn" onclick="abrirFicha('${agente.id}', true)">Acessar Ficha</button>`
-        : `<button class="agent-card-btn" style="background: #444; color: #888; cursor: not-allowed;" disabled title="Acesso Restrito">Ficha Privada</button>`;
+    const acessarButtonHtml = canEdit
+      ? `<button class="agent-card-btn" onclick="abrirFicha('${agenteDocId}', true)">Acessar Ficha</button>`
+      : `<button class="agent-card-btn" style="background: #444; color: #888; cursor: not-allowed;" disabled title="Acesso Restrito">Ficha Privada</button>`;
 
-      const dataReg = new Date(agente.id).toLocaleDateString("pt-BR");
+    const dataReg =
+      agente.id && !isNaN(Number(agente.id))
+        ? new Date(Number(agente.id)).toLocaleDateString("pt-BR")
+        : "Data indisponível";
 
-      wrapper.innerHTML = `
-          <div class="agent-card-left">${fotoHtml}</div>
-          <div class="agent-card-right">
-            ${deleteButtonHtml}
-            <h4 class="agent-card-name">${agente.identidade.nome || "Desconhecido"}</h4>
-            <p class="agent-card-role">${agente.identidade.ocupacao || "Sem Ocupação"}</p>
-            <p class="agent-card-date">Registrado em ${dataReg}</p>
-            <div class="simple-card-actions">
-              ${acessarButtonHtml}
-            </div>
+    wrapper.innerHTML = `
+        <div class="agent-card-left">${fotoHtml}</div>
+        <div class="agent-card-right">
+          ${deleteButtonHtml}
+          <h4 class="agent-card-name">${agente.identidade?.nome || "Desconhecido"}</h4>
+          <p class="agent-card-role">${agente.identidade?.ocupacao || "Sem Ocupação"}</p>
+          <p class="agent-card-date">Registrado em ${dataReg}</p>
+          <div class="simple-card-actions">
+            ${acessarButtonHtml}
           </div>
-        `;
-      listaDiv.appendChild(wrapper);
+        </div>
+      `;
+    listaDiv.appendChild(wrapper);
+  });
 
-      // --- Constrói o cartão APENAS para a tela "Escudo do Mestre" ---
-      if (isCurrentUserMaster && escudoMestreContent) {
+  // 2. Renderiza os cartões dentro do Escudo do Mestre
+  if (escudoMestreContent) {
+    escudoMestreContent.innerHTML = "";
+    if (isCurrentUserMaster) {
+      cacheAgentesCampanha.forEach((agente, agenteDocId) => {
         const attr = agente.atributos || {};
         const st = agente.status || {};
         const ident = agente.identidade || {};
         const comb = agente.combate || {};
 
         const pvMax = Number(st.pv_max) || 1;
-        const pvPerc = Math.min(
-          100,
-          Math.max(0, ((Number(st.pv) || 0) / pvMax) * 100),
-        );
+        const pvCurrent = Number(st.pv) || 0;
+        const pvPerc = Math.min(100, Math.max(0, (pvCurrent / pvMax) * 100));
 
         const pdMax = Number(st.pd_max) || 1;
-        const pdPerc = Math.min(
-          100,
-          Math.max(0, ((Number(st.pd) || 0) / pdMax) * 100),
-        );
+        const pdCurrent = Number(st.pd) || 0;
+        const pdPerc = Math.min(100, Math.max(0, (pdCurrent / pdMax) * 100));
+
+        const fotoHtml =
+          agente.perfil && agente.perfil.foto_img
+            ? `<img src="${agente.perfil.foto_img}" alt="Foto de ${ident.nome || 'Agente'}">`
+            : `<div style="color: #666; font-size: 11px; text-transform: uppercase; text-align: center; padding: 10px;">Sem Foto</div>`;
 
         const masterCard = document.createElement("div");
         masterCard.className = "master-card";
+        masterCard.id = `master-card-${agenteDocId}`;
 
         masterCard.innerHTML = `
             <div class="mc-header">
@@ -757,14 +909,28 @@ async function renderizarListaAgentes() {
                 <div class="mc-bar-label">VIDA</div>
                 <div class="mc-bar-bg">
                   <div class="mc-bar-fill pv-fill" style="width: ${pvPerc}%"></div>
-                  <div class="mc-bar-text">${st.pv || 0} / ${st.pv_max || 0}</div>
+                  <div class="mc-bar-text">${pvCurrent} / ${st.pv_max || 0}</div>
+                </div>
+                <div class="mc-bar-controls">
+                  <button type="button" class="mc-ctrl-btn pv-sub-big" title="Tirar 5 PV" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pv', -5)">-5</button>
+                  <button type="button" class="mc-ctrl-btn pv-sub" title="Tirar 1 PV" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pv', -1)">-1</button>
+                  <input type="number" class="mc-ctrl-input" id="mc-input-pv-${agenteDocId}" value="${pvCurrent}" min="0" max="${st.pv_max || 999}" onchange="definirStatusAgenteMestre('${agenteDocId}', 'pv', this.value)" onkeydown="if(event.key==='Enter') this.blur()" />
+                  <button type="button" class="mc-ctrl-btn pv-add" title="Adicionar 1 PV" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pv', 1)">+1</button>
+                  <button type="button" class="mc-ctrl-btn pv-add-big" title="Adicionar 5 PV" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pv', 5)">+5</button>
                 </div>
               </div>
               <div class="mc-bar-container">
                 <div class="mc-bar-label">DETERMINAÇÃO</div>
                 <div class="mc-bar-bg">
                   <div class="mc-bar-fill pd-fill" style="width: ${pdPerc}%"></div>
-                  <div class="mc-bar-text">${st.pd || 0} / ${st.pd_max || 0}</div>
+                  <div class="mc-bar-text">${pdCurrent} / ${st.pd_max || 0}</div>
+                </div>
+                <div class="mc-bar-controls">
+                  <button type="button" class="mc-ctrl-btn pd-sub-big" title="Tirar 5 PD" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pd', -5)">-5</button>
+                  <button type="button" class="mc-ctrl-btn pd-sub" title="Tirar 1 PD" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pd', -1)">-1</button>
+                  <input type="number" class="mc-ctrl-input" id="mc-input-pd-${agenteDocId}" value="${pdCurrent}" min="0" max="${st.pd_max || 999}" onchange="definirStatusAgenteMestre('${agenteDocId}', 'pd', this.value)" onkeydown="if(event.key==='Enter') this.blur()" />
+                  <button type="button" class="mc-ctrl-btn pd-add" title="Adicionar 1 PD" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pd', 1)">+1</button>
+                  <button type="button" class="mc-ctrl-btn pd-add-big" title="Adicionar 5 PD" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pd', 5)">+5</button>
                 </div>
               </div>
             </div>
@@ -774,57 +940,75 @@ async function renderizarListaAgentes() {
               <div><span>DB</span><strong>${comb.db || 0}</strong></div>
             </div>
             <div class="mc-footer">
-              <button class="mc-btn-ficha" onclick="abrirFicha('${agente.id}', true)">Abrir Ficha do Agente</button>
+              <button class="mc-btn-ficha" onclick="abrirFicha('${agenteDocId}', true)">Abrir Ficha do Agente</button>
             </div>
         `;
         escudoMestreContent.appendChild(masterCard);
+      });
+
+      // Restaura o foco se o usuário estava com um input selecionado
+      if (focusedId) {
+        const inputEl = document.getElementById(focusedId);
+        if (inputEl) {
+          inputEl.focus();
+          if (selStart !== null && selEnd !== null) {
+            try {
+              inputEl.setSelectionRange(selStart, selEnd);
+            } catch (e) {}
+          }
+        }
       }
-    });
-  } catch (error) {
-    console.error("Erro ao carregar lista de agentes:", error);
-    listaDiv.innerHTML = `<p style="color:red; text-align:center;">Erro de permissões ao carregar fichas.</p>`;
+    }
   }
 }
 
-async function carregarIniciativaMestre() {
-  const iniciativaTextarea = document.getElementById("escudo-mestre-iniciativa");
-  if (!iniciativaTextarea || !currentCampaignId) return;
-
-  iniciativaTextarea.disabled = true;
-  iniciativaTextarea.placeholder = "A carregar iniciativa...";
+// Funções para alteração em tempo real pelo Mestre
+window.alterarStatusAgenteMestre = async (agenteDocId, statKey, delta) => {
+  const agente = cacheAgentesCampanha.get(agenteDocId);
+  if (!agente) return;
+  const st = agente.status || {};
+  const currentVal = Number(st[statKey]) || 0;
+  const maxVal = Number(st[`${statKey}_max`]) || 0;
+  let novoVal = currentVal + delta;
+  if (novoVal < 0) novoVal = 0;
+  if (maxVal > 0 && novoVal > maxVal) novoVal = maxVal;
 
   try {
-    const docRef = doc(db, "campaigns", currentCampaignId);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      iniciativaTextarea.value = data.iniciativaMestre || "";
-    } else {
-      iniciativaTextarea.value = "";
-    }
+    const agenteRef = doc(db, "agentes", String(agenteDocId));
+    await updateDoc(agenteRef, {
+      [`status.${statKey}`]: novoVal,
+    });
   } catch (error) {
-    console.error("Erro ao carregar iniciativa do Firebase:", error);
-  } finally {
-    iniciativaTextarea.disabled = false;
-    iniciativaTextarea.placeholder = "Escreva a iniciativa de todos aqui (agentes e monstros)...";
+    console.error(`Erro ao atualizar ${statKey} do agente:`, error);
+    alert(`Erro ao atualizar ${statKey.toUpperCase()}. Verifique as permissões.`);
   }
+};
 
-  let timeoutSalvarIniciativa;
-  iniciativaTextarea.oninput = (e) => {
-    clearTimeout(timeoutSalvarIniciativa);
-    timeoutSalvarIniciativa = setTimeout(async () => {
-      try {
-        const docRef = doc(db, "campaigns", currentCampaignId);
-        await updateDoc(docRef, {
-          iniciativaMestre: e.target.value
-        });
-      } catch (error) {
-        console.error("Erro ao salvar iniciativa no Firebase:", error);
-      }
-    }, 1500);
-  };
-}
+window.definirStatusAgenteMestre = async (agenteDocId, statKey, valorStr) => {
+  const agente = cacheAgentesCampanha.get(agenteDocId);
+  if (!agente) return;
+  const num = parseInt(valorStr, 10);
+  if (isNaN(num)) return;
+  const st = agente.status || {};
+  const maxVal = Number(st[`${statKey}_max`]) || 0;
+  let novoVal = num;
+  if (novoVal < 0) novoVal = 0;
+  if (maxVal > 0 && novoVal > maxVal) novoVal = maxVal;
+
+  try {
+    const agenteRef = doc(db, "agentes", String(agenteDocId));
+    await updateDoc(agenteRef, {
+      [`status.${statKey}`]: novoVal,
+    });
+  } catch (error) {
+    console.error(`Erro ao definir ${statKey} do agente:`, error);
+    alert(`Erro ao definir ${statKey.toUpperCase()}. Verifique as permissões.`);
+  }
+};
+
+window.renderizarListaAgentes = () => {
+  iniciarOuvinteAgentes();
+};
 
 
 
