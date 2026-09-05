@@ -716,7 +716,8 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .success-table th {
-  background: #efefef;
+  background: #9a9a9a;
+  color: #fff;
 }
 
 .success-table .axis {
@@ -1432,8 +1433,10 @@ body.dark-theme .attribute-web {
   filter: invert(0.9) hue-rotate(180deg);
 }
 
+body.dark-theme .success-table th,
 body.dark-theme .axis {
   background: #3a3a3a;
+  color: #fff;
 }
 
 /* ==========================================

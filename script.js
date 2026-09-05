@@ -661,7 +661,7 @@ function desenharTabelaSucessosEscudo() {
   if (!tabelaDiv || tabelaDiv.children.length > 0) return; // Já desenhada
 
   let html = '<table class="success-table"><thead><tr><th class="axis">V \\ R</th>';
-  for (let r = 1; r <= 20; r++) html += `<th>${r}</th>`;
+  for (let r = 1; r <= 20; r++) html += `<th class="axis">${r}</th>`;
   html += "</tr></thead><tbody>";
   for (let v = 1; v <= 20; v++) {
     html += `<tr><th class="axis">${v}</th>`;

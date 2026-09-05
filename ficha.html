@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ficha do Agente - Protocolo Miragem</title>
-    <link rel="stylesheet" href="style.css?v=16" />
+    <link rel="stylesheet" href="style.css?v=17" />
   </head>
   <body class="ficha-body">
     <!-- Botão Flutuante de Modo Escuro Minimalista -->
@@ -1358,7 +1358,7 @@
                 if (!tabelaDiv) return;
                 let html =
                   '<table class="success-table"><thead><tr><th class="axis">V \\ R</th>';
-                for (let r = 1; r <= 20; r++) html += `<th>${r}</th>`;
+                for (let r = 1; r <= 20; r++) html += `<th class="axis">${r}</th>`;
                 html += "</tr></thead><tbody>";
                 for (let v = 1; v <= 20; v++) {
                   html += `<tr><th class="axis">${v}</th>`;
@@ -1667,6 +1667,6 @@
       </div>
     </div>
 
-    <script type="module" src="script.js?v=16"></script>
+    <script type="module" src="script.js?v=18"></script>
   </body>
 </html>

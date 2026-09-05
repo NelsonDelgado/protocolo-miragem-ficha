@@ -692,11 +692,7 @@ body {
   font-weight: 800;
 }
 
-.success-table th {
-  background: #25282c;
-  color: #fff;
-}
-
+.success-table th,
 .success-table .axis {
   background: #3a3f45;
   color: #fff;
