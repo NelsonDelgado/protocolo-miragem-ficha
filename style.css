@@ -741,9 +741,13 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 .success-bom {
   background: #88ce6c;
+  color: #000000;
+  font-weight: bold;
 }
 .success-normal {
   background: #dcefd1;
+  color: #000000;
+  font-weight: bold;
 }
 .success-falha {
   background: #f91515;
@@ -1598,6 +1602,12 @@ body.dark-theme .success-table th,
 body.dark-theme .axis {
   background: #3a3a3a;
   color: #fff;
+}
+
+body.dark-theme .success-bom,
+body.dark-theme .success-normal {
+  color: #000000 !important;
+  font-weight: bold;
 }
 
 /* ==========================================
