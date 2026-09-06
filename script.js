@@ -870,6 +870,8 @@ function renderizarUiAgentes() {
         const pvMax = Number(st.pv_max) || 1;
         const pvCurrent = Number(st.pv) || 0;
         const pvPerc = Math.min(100, Math.max(0, (pvCurrent / pvMax) * 100));
+        const isPvOver = st.pv_max > 0 && pvCurrent > st.pv_max;
+        const pvOverText = isPvOver ? ` <span style="color:#ffd700; font-size:11px; text-shadow:0 0 3px #000;">(+${pvCurrent - st.pv_max})</span>` : "";
 
         const pdMax = Number(st.pd_max) || 1;
         const pdCurrent = Number(st.pd) || 0;
@@ -906,13 +908,13 @@ function renderizarUiAgentes() {
               <div class="mc-bar-container">
                 <div class="mc-bar-label">VIDA</div>
                 <div class="mc-bar-bg">
-                  <div class="mc-bar-fill pv-fill" style="width: ${pvPerc}%"></div>
-                  <div class="mc-bar-text">${pvCurrent} / ${st.pv_max || 0}</div>
+                  <div class="mc-bar-fill pv-fill ${isPvOver ? "pv-overheal" : ""}" style="width: ${pvPerc}%"></div>
+                  <div class="mc-bar-text">${pvCurrent} / ${st.pv_max || 0}${pvOverText}</div>
                 </div>
                 <div class="mc-bar-controls">
                   <button type="button" class="mc-ctrl-btn pv-sub-big" title="Tirar 5 PV" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pv', -5)">-5</button>
                   <button type="button" class="mc-ctrl-btn pv-sub" title="Tirar 1 PV" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pv', -1)">-1</button>
-                  <input type="number" class="mc-ctrl-input" id="mc-input-pv-${agenteDocId}" value="${pvCurrent}" min="0" max="${st.pv_max || 999}" onchange="definirStatusAgenteMestre('${agenteDocId}', 'pv', this.value)" onkeydown="if(event.key==='Enter') this.blur()" />
+                  <input type="number" class="mc-ctrl-input" id="mc-input-pv-${agenteDocId}" value="${pvCurrent}" min="0" onchange="definirStatusAgenteMestre('${agenteDocId}', 'pv', this.value)" onkeydown="if(event.key==='Enter') this.blur()" />
                   <button type="button" class="mc-ctrl-btn pv-add" title="Adicionar 1 PV" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pv', 1)">+1</button>
                   <button type="button" class="mc-ctrl-btn pv-add-big" title="Adicionar 5 PV" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pv', 5)">+5</button>
                 </div>
@@ -926,7 +928,7 @@ function renderizarUiAgentes() {
                 <div class="mc-bar-controls">
                   <button type="button" class="mc-ctrl-btn pd-sub-big" title="Tirar 5 PD" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pd', -5)">-5</button>
                   <button type="button" class="mc-ctrl-btn pd-sub" title="Tirar 1 PD" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pd', -1)">-1</button>
-                  <input type="number" class="mc-ctrl-input" id="mc-input-pd-${agenteDocId}" value="${pdCurrent}" min="0" max="${st.pd_max || 999}" onchange="definirStatusAgenteMestre('${agenteDocId}', 'pd', this.value)" onkeydown="if(event.key==='Enter') this.blur()" />
+                  <input type="number" class="mc-ctrl-input" id="mc-input-pd-${agenteDocId}" value="${pdCurrent}" min="0" onchange="definirStatusAgenteMestre('${agenteDocId}', 'pd', this.value)" onkeydown="if(event.key==='Enter') this.blur()" />
                   <button type="button" class="mc-ctrl-btn pd-add" title="Adicionar 1 PD" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pd', 1)">+1</button>
                   <button type="button" class="mc-ctrl-btn pd-add-big" title="Adicionar 5 PD" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pd', 5)">+5</button>
                 </div>
@@ -966,10 +968,9 @@ window.alterarStatusAgenteMestre = async (agenteDocId, statKey, delta) => {
   if (!agente) return;
   const st = agente.status || {};
   const currentVal = Number(st[statKey]) || 0;
-  const maxVal = Number(st[`${statKey}_max`]) || 0;
   let novoVal = currentVal + delta;
   if (novoVal < 0) novoVal = 0;
-  if (maxVal > 0 && novoVal > maxVal) novoVal = maxVal;
+  // Permite ultrapassar o limite maximo (ex: vida temporaria)
 
   try {
     const agenteRef = doc(db, "agentes", String(agenteDocId));
@@ -987,11 +988,9 @@ window.definirStatusAgenteMestre = async (agenteDocId, statKey, valorStr) => {
   if (!agente) return;
   const num = parseInt(valorStr, 10);
   if (isNaN(num)) return;
-  const st = agente.status || {};
-  const maxVal = Number(st[`${statKey}_max`]) || 0;
   let novoVal = num;
   if (novoVal < 0) novoVal = 0;
-  if (maxVal > 0 && novoVal > maxVal) novoVal = maxVal;
+  // Permite ultrapassar o limite maximo (ex: vida temporaria)
 
   try {
     const agenteRef = doc(db, "agentes", String(agenteDocId));
