@@ -25,7 +25,7 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-import { REGRAS } from "./regras.js";
+import { REGRAS } from "./regras.js?v=19";
 
 const firebaseConfig = {
   // Dados de autenticacao firebase
@@ -1242,7 +1242,11 @@ if (formFicha) {
       card.className = "interactive-item-card";
 
       const isPoder = item.tipo === "poder";
-      let typeStr = isPoder ? `Poder de Incógnita - ${item.vertente}` : `Habilidade - ${item.categoria}`;
+      let typeStr = isPoder
+        ? `Poder de Incógnita - ${item.vertente}`
+        : item.categoria === "Banda"
+          ? `Habilidade de Banda (Equipe)`
+          : `Habilidade - ${item.categoria}`;
       if (item.custo && item.custo !== "-") typeStr += ` | Custo: ${item.custo}`;
 
       let extraInfoHtml = "";
@@ -1332,7 +1336,7 @@ if (formFicha) {
     } else if (tipo === "habilidade") {
       title.textContent = "Adicionar Habilidade";
       filterSelect.style.display = "block";
-      const cats = ["Combate", "Físico", "Intelectual", "Social", "Véu"];
+      const cats = ["Combate", "Físico", "Intelectual", "Social", "Véu", "Banda"];
       cats.forEach(c => {
         const opt = document.createElement("option");
         opt.value = c;
@@ -1342,7 +1346,7 @@ if (formFicha) {
     } else if (tipo === "poder") {
       title.textContent = "Adicionar Poder de Incógnita";
       filterSelect.style.display = "block";
-      const vertentes = ["Uncanny", "Paranoia", "Angústia", "Selvagem", "Nesting", "Erradicação", "Opressão"];
+      const vertentes = ["Uncanny", "Paranoia", "Angústia", "Selvagem", "Nesting", "Erradicação", "Opressão", "Áurea"];
       vertentes.forEach(v => {
         const opt = document.createElement("option");
         opt.value = v;
@@ -1544,6 +1548,12 @@ if (formFicha) {
       salvarBensMateriaisNuvem();
     } else if (currentModalType === "habilidade") {
       if (!Array.isArray(agenteAtual.habilidades.lista)) agenteAtual.habilidades.lista = [];
+      if (item.categoria === "Banda") {
+        const totalBanda = agenteAtual.habilidades.lista.filter(x => x.categoria === "Banda").length;
+        if (totalBanda >= 2) {
+          return alert("Limite das Regras: Cada personagem pode ter no máximo 2 Habilidades de Banda.");
+        }
+      }
       agenteAtual.habilidades.lista.push({
         id: item.id,
         nome: item.nome,
