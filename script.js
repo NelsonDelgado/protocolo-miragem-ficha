@@ -1417,7 +1417,7 @@ if (formFicha) {
     const btnCustom = document.getElementById("modal-selecao-btn-custom");
     if (btnCustom) {
       if (["fobia", "mania", "ferimento", "habilidade", "poder", "ritual"].includes(tipo)) {
-        btnCustom.style.display = "inline-block";
+        btnCustom.style.display = "flex";
         btnCustom.textContent = tipo === "ritual"
           ? "+ Criar Ritual Próprio"
           : (tipo === "habilidade"

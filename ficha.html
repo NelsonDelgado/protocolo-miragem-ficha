@@ -1642,11 +1642,15 @@
           <button type="button" id="modal-selecao-close" class="modal-close">&times;</button>
         </div>
         <div class="modal-filters">
-          <input type="search" id="modal-selecao-search" placeholder="🔍 Buscar por nome, efeito, categoria..." autocomplete="off" spellcheck="false" />
-          <select id="modal-selecao-filter">
-            <option value="">Todos</option>
-          </select>
-          <button type="button" id="modal-selecao-btn-custom" class="interactive-add-btn" style="margin: 0; white-space: nowrap; font-size: 11px;">+ Criar Próprio</button>
+          <div class="modal-search-row">
+            <input type="search" id="modal-selecao-search" placeholder="🔍 Buscar por nome, efeito, categoria..." autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="modal-actions-row">
+            <select id="modal-selecao-filter">
+              <option value="">Todos</option>
+            </select>
+            <button type="button" id="modal-selecao-btn-custom" class="interactive-add-btn">+ Criar Próprio</button>
+          </div>
         </div>
         <div id="modal-selecao-body" class="modal-body">
           <!-- Items renderizados dinamicamente -->
@@ -1673,6 +1677,6 @@
       </div>
     </div>
 
-    <script type="module" src="script.js?v=28"></script>
+    <script type="module" src="script.js?v=29"></script>
   </body>
 </html>
