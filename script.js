@@ -254,8 +254,6 @@ function criarAgenteEmBranco(nomeInicial) {
       notas: "",
     },
     recursos: {
-      patente: "",
-      categoria: "",
       poupanca: "",
       salario: "",
       bens_materiais: [],
