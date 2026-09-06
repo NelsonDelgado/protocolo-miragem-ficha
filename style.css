@@ -1144,6 +1144,26 @@ input[type="number"]::-webkit-outer-spin-button {
   color: #111;
 }
 
+.item-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.item-card-edit {
+  background: none;
+  border: none;
+  color: #1976d2;
+  font-weight: 800;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.item-card-edit:hover {
+  text-decoration: underline;
+}
+
 .item-card-remove {
   background: none;
   border: none;
@@ -1339,6 +1359,63 @@ input[type="number"]::-webkit-outer-spin-button {
   border-top: 1px dashed rgba(0, 0, 0, 0.15);
   padding-top: 4px;
   color: #222;
+}
+
+/* Formulário do Modal de Edição de Itens */
+.item-editor-form {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.item-editor-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  max-height: 65vh;
+  padding-right: 6px;
+}
+
+.item-editor-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.item-editor-group label {
+  font-family: Georgia, serif;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.item-editor-group input,
+.item-editor-group select,
+.item-editor-group textarea {
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--ink);
+  box-sizing: border-box;
+}
+
+.item-editor-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.item-editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+  border-top: 2px solid var(--line);
+  padding-top: 12px;
 }
 
 /* ==========================================
@@ -1633,5 +1710,29 @@ body.dark-theme .modal-list-item-btn:hover {
 
 body.dark-theme .pericia-div5 {
   color: #fbfbf8;
+}
+
+body.dark-theme .item-card-edit {
+  color: #64b5f6;
+}
+
+body.dark-theme .item-card-edit:hover {
+  color: #90caf9;
+}
+
+body.dark-theme .item-editor-group label {
+  color: #e0e0e0;
+}
+
+body.dark-theme .item-editor-group input,
+body.dark-theme .item-editor-group select,
+body.dark-theme .item-editor-group textarea {
+  background: #252525;
+  color: #fbfbf8;
+  border-color: #555555;
+}
+
+body.dark-theme .item-editor-footer {
+  border-top-color: #444444;
 }
 

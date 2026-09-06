@@ -1646,6 +1646,7 @@
           <select id="modal-selecao-filter">
             <option value="">Todos</option>
           </select>
+          <button type="button" id="modal-selecao-btn-custom" class="interactive-add-btn" style="margin: 0; white-space: nowrap; font-size: 11px;">+ Criar Próprio</button>
         </div>
         <div id="modal-selecao-body" class="modal-body">
           <!-- Items renderizados dinamicamente -->
@@ -1653,6 +1654,25 @@
       </div>
     </div>
 
-    <script type="module" src="script.js?v=26"></script>
+    <!-- Modal de Edição e Criação de Item Personalizado -->
+    <div id="item-editor-modal" class="modal-overlay hidden">
+      <div class="modal-content" style="max-width: 620px;">
+        <div class="modal-header">
+          <span id="item-editor-title" class="modal-title">Editar Item</span>
+          <button type="button" id="item-editor-close" class="modal-close">&times;</button>
+        </div>
+        <form id="item-editor-form" class="item-editor-form">
+          <div id="item-editor-fields" class="item-editor-fields">
+            <!-- Campos gerados dinamicamente via JS -->
+          </div>
+          <div class="item-editor-footer">
+            <button type="button" id="item-editor-cancel" class="btn-dark" style="background:#555; border-color:#555;">Cancelar</button>
+            <button type="submit" id="item-editor-save" class="btn-dark">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script type="module" src="script.js?v=27"></script>
   </body>
 </html>

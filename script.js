@@ -1101,7 +1101,12 @@ if (formFicha) {
       card.innerHTML = `
         <div class="item-card-header">
           <span class="item-card-title">${t.nome}</span>
-          ${isReadOnly ? "" : `<button type="button" class="item-card-remove" onclick="window.removerTrauma(${index})">Remover</button>`}
+          ${isReadOnly ? "" : `
+            <div class="item-card-actions">
+              <button type="button" class="item-card-edit" onclick="window.editarTrauma(${index})">Editar</button>
+              <button type="button" class="item-card-remove" onclick="window.removerTrauma(${index})">Remover</button>
+            </div>
+          `}
         </div>
         <div class="item-card-details">${badge}</div>
         ${desc ? `<div class="item-card-desc">${desc}</div>` : ""}
@@ -1260,7 +1265,12 @@ if (formFicha) {
       card.innerHTML = `
         <div class="item-card-header">
           <span class="item-card-title">${item.nome}</span>
-          ${isReadOnly ? "" : `<button type="button" class="item-card-remove" onclick="window.removerHabilidadePoder(${index})">Remover</button>`}
+          ${isReadOnly ? "" : `
+            <div class="item-card-actions">
+              <button type="button" class="item-card-edit" onclick="window.editarHabilidadePoder(${index})">Editar</button>
+              <button type="button" class="item-card-remove" onclick="window.removerHabilidadePoder(${index})">Remover</button>
+            </div>
+          `}
         </div>
         <div class="item-card-details">${typeStr}</div>
         <div class="item-card-desc">${item.descricao}</div>
@@ -1294,7 +1304,12 @@ if (formFicha) {
       card.innerHTML = `
         <div class="item-card-header">
           <span class="item-card-title">${rit.nome}</span>
-          ${isReadOnly ? "" : `<button type="button" class="item-card-remove" onclick="window.removerRitual(${index})">Remover</button>`}
+          ${isReadOnly ? "" : `
+            <div class="item-card-actions">
+              <button type="button" class="item-card-edit" onclick="window.editarRitual(${index})">Editar</button>
+              <button type="button" class="item-card-remove" onclick="window.removerRitual(${index})">Remover</button>
+            </div>
+          `}
         </div>
         <div class="item-card-details">${detailsStr}</div>
         <div class="item-card-desc">${rit.desc}</div>
@@ -1397,6 +1412,32 @@ if (formFicha) {
     } else if (tipo === "veiculo") {
       title.textContent = "Adicionar Veículo";
       filterSelect.style.display = "none";
+    }
+
+    const btnCustom = document.getElementById("modal-selecao-btn-custom");
+    if (btnCustom) {
+      if (["fobia", "mania", "ferimento", "habilidade", "poder", "ritual"].includes(tipo)) {
+        btnCustom.style.display = "inline-block";
+        btnCustom.textContent = tipo === "ritual"
+          ? "+ Criar Ritual Próprio"
+          : (tipo === "habilidade"
+            ? "+ Criar Habilidade Própria"
+            : (tipo === "poder"
+              ? "+ Criar Poder Próprio"
+              : "+ Criar Próprio"));
+        btnCustom.onclick = () => {
+          modal.classList.add("hidden");
+          if (tipo === "fobia" || tipo === "mania" || tipo === "ferimento") {
+            abrirEditorTrauma(-1, tipo);
+          } else if (tipo === "habilidade" || tipo === "poder") {
+            abrirEditorHabilidadePoder(-1, tipo);
+          } else if (tipo === "ritual") {
+            abrirEditorRitual(-1);
+          }
+        };
+      } else {
+        btnCustom.style.display = "none";
+      }
     }
 
     filtrarItensModal();
@@ -1781,7 +1822,437 @@ if (formFicha) {
     }).catch(e => console.error("Erro ao salvar rituais:", e));
   }
 
+  function escapeHtml(str) {
+    if (typeof str !== "string") return str == null ? "" : String(str);
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  let editingItemState = null;
+
+  function fecharModalEditor() {
+    const modal = document.getElementById("item-editor-modal");
+    if (modal) modal.classList.add("hidden");
+    editingItemState = null;
+  }
+
+  window.editarTrauma = (index) => {
+    abrirEditorTrauma(index, null);
+  };
+
+  function abrirEditorTrauma(index, defaultTipo = "fobia") {
+    if (isReadOnly || !agenteAtual) return;
+    const isNew = index === -1;
+    const item = !isNew && agenteAtual.perfil?.traumas?.[index]
+      ? agenteAtual.perfil.traumas[index]
+      : { tipo: defaultTipo || "fobia", nome: "", efeito: "" };
+
+    editingItemState = { category: "trauma", index, isNew };
+
+    const modal = document.getElementById("item-editor-modal");
+    const title = document.getElementById("item-editor-title");
+    const fields = document.getElementById("item-editor-fields");
+    if (!modal || !fields) return;
+
+    const itemTipo = item.tipo || item.type || defaultTipo || "fobia";
+    if (title) {
+      title.textContent = isNew ? "Adicionar Trauma Personalizado" : "Editar Trauma (Fobia/Mania/Ferimento)";
+    }
+
+    fields.innerHTML = `
+      <div class="item-editor-group">
+        <label for="editor-trauma-tipo">Tipo de Trauma:</label>
+        <select id="editor-trauma-tipo">
+          <option value="fobia" ${itemTipo === "fobia" ? "selected" : ""}>Fobia</option>
+          <option value="mania" ${itemTipo === "mania" ? "selected" : ""}>Mania</option>
+          <option value="ferimento" ${itemTipo === "ferimento" ? "selected" : ""}>Ferimento Grave</option>
+        </select>
+      </div>
+      <div class="item-editor-group">
+        <label for="editor-trauma-nome">Nome / Título:</label>
+        <input type="text" id="editor-trauma-nome" value="${escapeHtml(item.nome || "")}" placeholder="Ex: Claustrofobia, Tique Nervoso, Fratura Exposta..." required />
+      </div>
+      <div class="item-editor-group">
+        <label for="editor-trauma-efeito">Efeito / Descrição:</label>
+        <textarea id="editor-trauma-efeito" rows="5" placeholder="Descreva os efeitos mecânicos ou narrativos..." required>${escapeHtml(item.efeito || item.descricao || "")}</textarea>
+      </div>
+    `;
+
+    modal.classList.remove("hidden");
+  }
+
+  window.editarHabilidadePoder = (index) => {
+    abrirEditorHabilidadePoder(index, null);
+  };
+
+  function abrirEditorHabilidadePoder(index, defaultTipo = "habilidade") {
+    if (isReadOnly || !agenteAtual) return;
+    const isNew = index === -1;
+    const item = !isNew && agenteAtual.habilidades?.lista?.[index]
+      ? agenteAtual.habilidades.lista[index]
+      : { tipo: defaultTipo || "habilidade", nome: "", categoria: "Combate", vertente: "Tempo", custo: "-", requisito: "-", afinidade: "", descricao: "" };
+
+    editingItemState = { category: "habilidade_poder", index, isNew };
+
+    const modal = document.getElementById("item-editor-modal");
+    const title = document.getElementById("item-editor-title");
+    const fields = document.getElementById("item-editor-fields");
+    if (!modal || !fields) return;
+
+    const tipo = item.tipo || defaultTipo || "habilidade";
+    const isPoder = tipo === "poder";
+    if (title) {
+      title.textContent = isNew
+        ? (isPoder ? "Adicionar Poder de Incógnita" : "Adicionar Habilidade")
+        : (isPoder ? "Editar Poder de Incógnita" : "Editar Habilidade");
+    }
+
+    fields.innerHTML = `
+      <div class="item-editor-group">
+        <label for="editor-hab-tipo">Tipo:</label>
+        <select id="editor-hab-tipo">
+          <option value="habilidade" ${!isPoder ? "selected" : ""}>Habilidade</option>
+          <option value="poder" ${isPoder ? "selected" : ""}>Poder de Incógnita</option>
+        </select>
+      </div>
+      <div class="item-editor-group">
+        <label for="editor-hab-nome">Nome:</label>
+        <input type="text" id="editor-hab-nome" value="${escapeHtml(item.nome || "")}" placeholder="Nome da Habilidade ou Poder..." required />
+      </div>
+
+      <div id="editor-sub-habilidade" style="display: ${isPoder ? "none" : "flex"}; flex-direction: column; gap: 12px;">
+        <div class="item-editor-row">
+          <div class="item-editor-group">
+            <label for="editor-hab-categoria">Categoria:</label>
+            <input type="text" id="editor-hab-categoria" list="lista-categorias-hab" value="${escapeHtml(item.categoria || "Combate")}" placeholder="Ex: Combate, Físico, Banda..." />
+            <datalist id="lista-categorias-hab">
+              <option value="Combate"></option>
+              <option value="Físico"></option>
+              <option value="Intelectual"></option>
+              <option value="Social"></option>
+              <option value="Véu"></option>
+              <option value="Banda"></option>
+            </datalist>
+          </div>
+          <div class="item-editor-group">
+            <label for="editor-hab-custo">Custo:</label>
+            <input type="text" id="editor-hab-custo" value="${escapeHtml(item.custo || "-")}" placeholder="Ex: 1 PM, 2 PE, -" />
+          </div>
+        </div>
+        <div class="item-editor-group">
+          <label for="editor-hab-requisito">Requisito:</label>
+          <input type="text" id="editor-hab-requisito" value="${escapeHtml(item.requisito || "-")}" placeholder="Ex: Luta 50%, Intelectual..." />
+        </div>
+      </div>
+
+      <div id="editor-sub-poder" style="display: ${isPoder ? "flex" : "none"}; flex-direction: column; gap: 12px;">
+        <div class="item-editor-row">
+          <div class="item-editor-group">
+            <label for="editor-hab-vertente">Vertente:</label>
+            <input type="text" id="editor-hab-vertente" list="lista-vertentes-poder" value="${escapeHtml(item.vertente || "Tempo")}" placeholder="Ex: Tempo, Mente, Sombra..." />
+            <datalist id="lista-vertentes-poder">
+              <option value="Uncanny"></option>
+              <option value="Paranoia"></option>
+              <option value="Angústia"></option>
+              <option value="Selvagem"></option>
+              <option value="Nesting"></option>
+              <option value="Erradicação"></option>
+              <option value="Opressão"></option>
+              <option value="Áurea"></option>
+              <option value="Alteração"></option>
+              <option value="Cinética"></option>
+              <option value="Dimensão"></option>
+              <option value="Espaço"></option>
+              <option value="Matéria"></option>
+              <option value="Mente"></option>
+              <option value="Sentidos"></option>
+              <option value="Sombra"></option>
+              <option value="Tempo"></option>
+            </datalist>
+          </div>
+          <div class="item-editor-group">
+            <label for="editor-hab-custo-poder">Custo:</label>
+            <input type="text" id="editor-hab-custo-poder" value="${escapeHtml(item.custo || "-")}" placeholder="Ex: 1 PM, 2 PE, -" />
+          </div>
+        </div>
+        <div class="item-editor-group">
+          <label for="editor-hab-afinidade">Afinidade:</label>
+          <input type="text" id="editor-hab-afinidade" value="${escapeHtml(item.afinidade || "")}" placeholder="Ex: Mente 3, -" />
+        </div>
+      </div>
+
+      <div class="item-editor-group">
+        <label for="editor-hab-descricao">Descrição / Efeito:</label>
+        <textarea id="editor-hab-descricao" rows="5" placeholder="Descrição completa..." required>${escapeHtml(item.descricao || "")}</textarea>
+      </div>
+    `;
+
+    const tipoSelect = document.getElementById("editor-hab-tipo");
+    if (tipoSelect) {
+      tipoSelect.onchange = () => {
+        const nowPoder = tipoSelect.value === "poder";
+        const subHab = document.getElementById("editor-sub-habilidade");
+        const subPod = document.getElementById("editor-sub-poder");
+        if (subHab) subHab.style.display = nowPoder ? "none" : "flex";
+        if (subPod) subPod.style.display = nowPoder ? "flex" : "none";
+        if (title) {
+          title.textContent = isNew
+            ? (nowPoder ? "Adicionar Poder de Incógnita" : "Adicionar Habilidade")
+            : (nowPoder ? "Editar Poder de Incógnita" : "Editar Habilidade");
+        }
+      };
+    }
+
+    modal.classList.remove("hidden");
+  }
+
+  window.editarRitual = (index) => {
+    abrirEditorRitual(index);
+  };
+
+  function abrirEditorRitual(index) {
+    if (isReadOnly || !agenteAtual) return;
+    const isNew = index === -1;
+    const item = !isNew && agenteAtual.habilidades?.rituais?.[index]
+      ? agenteAtual.habilidades.rituais[index]
+      : { nome: "", circulo: "Básico", aspecto: "", custo: "", alc: "", target: "", duracao: "", resistencia: "-", desc: "" };
+
+    editingItemState = { category: "ritual", index, isNew };
+
+    const modal = document.getElementById("item-editor-modal");
+    const title = document.getElementById("item-editor-title");
+    const fields = document.getElementById("item-editor-fields");
+    if (!modal || !fields) return;
+
+    if (title) {
+      title.textContent = isNew ? "Adicionar Ritual Personalizado" : "Editar Ritual";
+    }
+
+    fields.innerHTML = `
+      <div class="item-editor-group">
+        <label for="editor-rit-nome">Nome do Ritual:</label>
+        <input type="text" id="editor-rit-nome" value="${escapeHtml(item.nome || "")}" placeholder="Nome do ritual..." required />
+      </div>
+      <div class="item-editor-row">
+        <div class="item-editor-group">
+          <label for="editor-rit-circulo">Círculo:</label>
+          <input type="text" id="editor-rit-circulo" list="lista-circulos-rit" value="${escapeHtml(item.circulo || "Básico")}" placeholder="Ex: Básico, Soberano, Absoluto..." />
+          <datalist id="lista-circulos-rit">
+            <option value="Básico"></option>
+            <option value="Soberano"></option>
+            <option value="Absoluto"></option>
+            <option value="1º Círculo"></option>
+            <option value="2º Círculo"></option>
+            <option value="3º Círculo"></option>
+            <option value="4º Círculo"></option>
+            <option value="5º Círculo"></option>
+          </datalist>
+        </div>
+        <div class="item-editor-group">
+          <label for="editor-rit-aspecto">Aspecto:</label>
+          <input type="text" id="editor-rit-aspecto" value="${escapeHtml(item.aspecto || "")}" placeholder="Ex: Tempo, Mente, Sangue..." />
+        </div>
+      </div>
+      <div class="item-editor-row">
+        <div class="item-editor-group">
+          <label for="editor-rit-custo">Custo:</label>
+          <input type="text" id="editor-rit-custo" value="${escapeHtml(item.custo || "")}" placeholder="Ex: 1 PE, 2 PE + 1 PM..." />
+        </div>
+        <div class="item-editor-group">
+          <label for="editor-rit-resistencia">Resistência:</label>
+          <input type="text" id="editor-rit-resistencia" value="${escapeHtml(item.resistencia || "-")}" placeholder="Ex: Vontade anula, -" />
+        </div>
+      </div>
+      <div class="item-editor-row">
+        <div class="item-editor-group">
+          <label for="editor-rit-alc">Alcance:</label>
+          <input type="text" id="editor-rit-alc" value="${escapeHtml(item.alc || "")}" placeholder="Ex: Curto, Toque, Médio..." />
+        </div>
+        <div class="item-editor-group">
+          <label for="editor-rit-target">Alvo:</label>
+          <input type="text" id="editor-rit-target" value="${escapeHtml(item.target || "")}" placeholder="Ex: 1 pessoa, Você..." />
+        </div>
+      </div>
+      <div class="item-editor-group">
+        <label for="editor-rit-duracao">Duração:</label>
+        <input type="text" id="editor-rit-duracao" value="${escapeHtml(item.duracao || "")}" placeholder="Ex: Instantâneo, Cena..." />
+      </div>
+      <div class="item-editor-group">
+        <label for="editor-rit-desc">Descrição / Efeito:</label>
+        <textarea id="editor-rit-desc" rows="6" placeholder="Descrição completa do ritual..." required>${escapeHtml(item.desc || item.descricao || "")}</textarea>
+      </div>
+    `;
+
+    modal.classList.remove("hidden");
+  }
+
+  const setupItemEditor = () => {
+    const modal = document.getElementById("item-editor-modal");
+    const closeBtn = document.getElementById("item-editor-close");
+    const cancelBtn = document.getElementById("item-editor-cancel");
+    const form = document.getElementById("item-editor-form");
+
+    if (closeBtn) closeBtn.onclick = fecharModalEditor;
+    if (cancelBtn) cancelBtn.onclick = fecharModalEditor;
+    if (modal) {
+      modal.onclick = (e) => {
+        if (e.target === modal) fecharModalEditor();
+      };
+    }
+
+    if (form) {
+      form.onsubmit = (e) => {
+        e.preventDefault();
+        if (isReadOnly || !agenteAtual || !editingItemState) return;
+
+        const { category, index, isNew } = editingItemState;
+
+        if (category === "trauma") {
+          const tipo = document.getElementById("editor-trauma-tipo").value;
+          const nome = document.getElementById("editor-trauma-nome").value.trim();
+          const efeito = document.getElementById("editor-trauma-efeito").value.trim();
+          if (!nome) return alert("Por favor, preencha o nome do trauma.");
+
+          if (!Array.isArray(agenteAtual.perfil.traumas)) agenteAtual.perfil.traumas = [];
+          const traumaObj = {
+            id: isNew ? Date.now() : (agenteAtual.perfil.traumas[index]?.id || Date.now()),
+            nome,
+            tipo,
+            type: tipo,
+            efeito
+          };
+
+          if (isNew) {
+            agenteAtual.perfil.traumas.push(traumaObj);
+          } else {
+            agenteAtual.perfil.traumas[index] = traumaObj;
+          }
+
+          renderizarTraumas();
+          calcularEAtualizarCargaESpeed();
+          updateDoc(doc(db, "agentes", String(agenteId)), {
+            "perfil.traumas": agenteAtual.perfil.traumas
+          }).catch(err => console.error("Erro ao salvar trauma:", err));
+
+        } else if (category === "habilidade_poder") {
+          const tipo = document.getElementById("editor-hab-tipo").value;
+          const nome = document.getElementById("editor-hab-nome").value.trim();
+          const descricao = document.getElementById("editor-hab-descricao").value.trim();
+          if (!nome) return alert("Por favor, preencha o nome.");
+
+          if (!Array.isArray(agenteAtual.habilidades.lista)) agenteAtual.habilidades.lista = [];
+
+          if (tipo === "habilidade") {
+            const categoria = document.getElementById("editor-hab-categoria").value.trim() || "Combate";
+            const custo = document.getElementById("editor-hab-custo").value.trim() || "-";
+            const requisito = document.getElementById("editor-hab-requisito").value.trim() || "-";
+
+            if (categoria === "Banda") {
+              const totalBanda = agenteAtual.habilidades.lista.filter((x, i) => x.categoria === "Banda" && (!isNew ? i !== index : true)).length;
+              if (totalBanda >= 2) {
+                return alert("Limite das Regras: Cada personagem pode ter no máximo 2 Habilidades de Banda.");
+              }
+            }
+
+            const habObj = {
+              id: isNew ? Date.now() : (agenteAtual.habilidades.lista[index]?.id || Date.now()),
+              nome,
+              tipo: "habilidade",
+              categoria,
+              custo,
+              descricao,
+              requisito
+            };
+
+            if (isNew) {
+              agenteAtual.habilidades.lista.push(habObj);
+            } else {
+              agenteAtual.habilidades.lista[index] = habObj;
+            }
+          } else {
+            const vertente = document.getElementById("editor-hab-vertente").value.trim() || "Tempo";
+            const custo = document.getElementById("editor-hab-custo-poder").value.trim() || "-";
+            const afinidade = document.getElementById("editor-hab-afinidade").value.trim() || "";
+
+            const poderObj = {
+              id: isNew ? Date.now() : (agenteAtual.habilidades.lista[index]?.id || Date.now()),
+              nome,
+              tipo: "poder",
+              vertente,
+              custo,
+              descricao,
+              afinidade
+            };
+
+            if (isNew) {
+              agenteAtual.habilidades.lista.push(poderObj);
+            } else {
+              agenteAtual.habilidades.lista[index] = poderObj;
+            }
+          }
+
+          renderizarHabilidadesPoderes();
+          calcularEAtualizarCargaESpeed();
+
+          const numPoderes = agenteAtual.habilidades.lista.filter(x => x.tipo === "poder").length;
+          const calculatedGC = 50 + numPoderes * 5;
+          agenteAtual.status.gc = calculatedGC;
+          const gcInput = document.getElementById("status-gc");
+          if (gcInput) gcInput.value = calculatedGC;
+
+          updateDoc(doc(db, "agentes", String(agenteId)), {
+            "habilidades.lista": agenteAtual.habilidades.lista,
+            "status.gc": calculatedGC
+          }).catch(err => console.error("Erro ao salvar habilidades e GC:", err));
+
+        } else if (category === "ritual") {
+          const nome = document.getElementById("editor-rit-nome").value.trim();
+          const circulo = document.getElementById("editor-rit-circulo").value.trim() || "Básico";
+          const aspecto = document.getElementById("editor-rit-aspecto").value.trim() || "-";
+          const custo = document.getElementById("editor-rit-custo").value.trim() || "-";
+          const alc = document.getElementById("editor-rit-alc").value.trim() || "-";
+          const target = document.getElementById("editor-rit-target").value.trim() || "-";
+          const duracao = document.getElementById("editor-rit-duracao").value.trim() || "-";
+          const resistencia = document.getElementById("editor-rit-resistencia").value.trim() || "-";
+          const desc = document.getElementById("editor-rit-desc").value.trim();
+          if (!nome) return alert("Por favor, preencha o nome do ritual.");
+
+          if (!Array.isArray(agenteAtual.habilidades.rituais)) agenteAtual.habilidades.rituais = [];
+
+          const ritObj = {
+            id: isNew ? Date.now() : (agenteAtual.habilidades.rituais[index]?.id || Date.now()),
+            nome,
+            circulo,
+            aspecto,
+            custo,
+            alc,
+            target,
+            duracao,
+            resistencia,
+            desc
+          };
+
+          if (isNew) {
+            agenteAtual.habilidades.rituais.push(ritObj);
+          } else {
+            agenteAtual.habilidades.rituais[index] = ritObj;
+          }
+
+          renderizarRituais();
+          salvarRituaisNuvem();
+        }
+
+        fecharModalEditor();
+      };
+    }
+  };
+
   const setupInteractiveButtons = () => {
+    setupItemEditor();
     const addFobia = document.getElementById("btn-add-fobia");
     const addMania = document.getElementById("btn-add-mania");
     const addFerimento = document.getElementById("btn-add-ferimento");
