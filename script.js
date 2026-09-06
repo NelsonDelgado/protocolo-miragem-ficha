@@ -25,7 +25,7 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-import { REGRAS } from "./regras.js?v=22";
+import { REGRAS } from "./regras.js?v=23";
 
 const firebaseConfig = {
   // Dados de autenticacao firebase
@@ -1863,6 +1863,17 @@ if (formFicha) {
     }, 1000);
   }
 
+  function atualizarIndicadoresPericiaDiv5() {
+    const periciaInputs = formFicha.querySelectorAll(".linha-pericia input[type='number']:not(.input-base-fixa)");
+    periciaInputs.forEach((input) => {
+      const val = parseInt(input.value, 10) || 0;
+      const div5Span = input.nextElementSibling;
+      if (div5Span && div5Span.classList.contains("pericia-div5")) {
+        div5Span.textContent = `(${Math.floor(val / 5)})`;
+      }
+    });
+  }
+
   function carregarFichaNaTela() {
     const docRef = doc(db, "agentes", String(agenteId));
 
@@ -1943,6 +1954,8 @@ if (formFicha) {
         }
       });
 
+      atualizarIndicadoresPericiaDiv5();
+
       // Atualizar a imagem da Marca em tempo real
       if (agenteAtual.habilidades && agenteAtual.habilidades.marca_img) {
         const marcaPreview = document.getElementById("marca-preview");
@@ -1978,6 +1991,7 @@ if (formFicha) {
       renderizarTudoInterativo();
     });
     setupInteractiveButtons();
+    atualizarIndicadoresPericiaDiv5();
   }
 
   formFicha.addEventListener("input", (evento) => {
@@ -1985,6 +1999,16 @@ if (formFicha) {
     if (!agenteAtual) return;
 
     const elemento = evento.target;
+
+    if (elemento.closest && elemento.closest(".linha-pericia")) {
+      const row = elemento.closest(".linha-pericia");
+      const atualInput = row.querySelector("input[type='number']:not(.input-base-fixa)");
+      const div5Span = row.querySelector(".pericia-div5");
+      if (atualInput && div5Span) {
+        const val = parseInt(atualInput.value, 10) || 0;
+        div5Span.textContent = `(${Math.floor(val / 5)})`;
+      }
+    }
 
     // Impede de tentar salvar o caminho invisível da imagem. A foto já tem um script de save próprio
     if (elemento.type === "file") return;
