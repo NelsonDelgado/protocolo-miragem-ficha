@@ -1132,6 +1132,7 @@ input[type="number"]::-webkit-outer-spin-button {
   font-size: 13px;
   font-weight: bold;
   text-transform: uppercase;
+  color: #111;
 }
 
 .item-card-remove {
@@ -1150,7 +1151,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .item-card-details {
   font-size: 11px;
-  color: var(--muted);
+  color: #555;
   font-style: italic;
 }
 
@@ -1158,6 +1159,15 @@ input[type="number"]::-webkit-outer-spin-button {
   font-size: 11px;
   line-height: 1.3;
   margin-top: 2px;
+  color: #222;
+}
+
+.item-card-afinidade {
+  color: #8e24aa;
+}
+
+.item-card-requisito {
+  color: #555;
 }
 
 .item-card-upgrades {
@@ -1289,6 +1299,7 @@ input[type="number"]::-webkit-outer-spin-button {
   font-size: 13px;
   font-weight: bold;
   text-transform: uppercase;
+  color: #111;
 }
 
 .modal-list-item-btn {
@@ -1308,7 +1319,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .modal-list-item-details {
   font-size: 11px;
-  color: var(--muted);
+  color: #555;
   font-style: italic;
 }
 
@@ -1318,6 +1329,7 @@ input[type="number"]::-webkit-outer-spin-button {
   margin-top: 4px;
   border-top: 1px dashed rgba(0, 0, 0, 0.15);
   padding-top: 4px;
+  color: #222;
 }
 
 /* ==========================================
@@ -1483,3 +1495,129 @@ body.dark-theme .boxed-area .editor-editable {
 .corruption-box .editor-editable { min-height: 260px; }
 .rituals-box .editor-editable { min-height: 260px; }
 .notes-box .editor-editable { min-height: 290px; }
+
+/* ==========================================
+   CARDS INTERATIVOS E MODAIS (MODO ESCURO)
+   ========================================== */
+body.dark-theme .interactive-container {
+  border-color: var(--line);
+  background: rgba(18, 18, 18, 0.7);
+}
+
+body.dark-theme .interactive-item-card {
+  background: #252525;
+  border-color: #3e3e3e;
+  color: #fbfbf8;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-theme .item-card-title {
+  color: #ffffff;
+  letter-spacing: 0.3px;
+}
+
+body.dark-theme .item-card-details {
+  color: #b0b0b0;
+}
+
+body.dark-theme .item-card-desc {
+  color: #e4e4e4;
+}
+
+body.dark-theme .item-card-afinidade {
+  color: #d8b4fe;
+}
+
+body.dark-theme .item-card-requisito {
+  color: #b8b8b8;
+}
+
+body.dark-theme .item-card-remove {
+  color: #ff6b6b;
+}
+
+body.dark-theme .item-card-remove:hover {
+  color: #ff9999;
+}
+
+body.dark-theme .item-card-upgrades {
+  border-top-color: rgba(255, 255, 255, 0.15);
+  color: #d0d0d0;
+}
+
+body.dark-theme .item-card-controls {
+  color: #d0d0d0;
+}
+
+body.dark-theme .interactive-add-btn {
+  background: #2b2b2b;
+  color: #fbfbf8;
+  border-color: var(--line);
+}
+
+body.dark-theme .interactive-add-btn:hover {
+  background: #3b3b3b;
+}
+
+/* Modais de Seleção no Modo Escuro */
+body.dark-theme .modal-content {
+  background: 
+    linear-gradient(rgba(20, 20, 20, 0.98), rgba(20, 20, 20, 0.98)),
+    url("fundo.png") center/cover no-repeat;
+  border-color: #555555;
+  outline-color: #555555;
+  color: #fbfbf8;
+  box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.7);
+}
+
+body.dark-theme .modal-header {
+  border-bottom-color: #444;
+}
+
+body.dark-theme .modal-title {
+  color: #ffffff;
+  text-shadow: none;
+}
+
+body.dark-theme .modal-close {
+  color: #ffffff;
+}
+
+body.dark-theme .modal-close:hover {
+  color: #ff6b6b;
+}
+
+body.dark-theme .modal-list-item {
+  background: #252525;
+  border-color: #3e3e3e;
+  color: #fbfbf8;
+}
+
+body.dark-theme .modal-list-item:hover {
+  border-color: #5a5a5a;
+  background: #2a2a2a;
+}
+
+body.dark-theme .modal-list-item-title {
+  color: #ffffff;
+}
+
+body.dark-theme .modal-list-item-details {
+  color: #b0b0b0;
+}
+
+body.dark-theme .modal-list-item-desc {
+  color: #e4e4e4;
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+
+body.dark-theme .modal-list-item-btn {
+  background: #3a3a3a;
+  color: #ffffff;
+  border-color: #666;
+}
+
+body.dark-theme .modal-list-item-btn:hover {
+  background: #505050;
+  border-color: #888;
+}

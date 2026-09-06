@@ -1251,9 +1251,9 @@ if (formFicha) {
 
       let extraInfoHtml = "";
       if (isPoder && item.afinidade) {
-        extraInfoHtml = `<div style="font-size:10px; color:#ba55d3; margin-top:2px;"><strong>Afinidade:</strong> ${item.afinidade}</div>`;
+        extraInfoHtml = `<div class="item-card-afinidade" style="font-size:10px; margin-top:2px;"><strong>Afinidade:</strong> ${item.afinidade}</div>`;
       } else if (!isPoder && item.requisito && item.requisito !== "-") {
-        extraInfoHtml = `<div style="font-size:10px; color:#555; margin-top:2px;"><strong>Requisito:</strong> ${item.requisito}</div>`;
+        extraInfoHtml = `<div class="item-card-requisito" style="font-size:10px; margin-top:2px;"><strong>Requisito:</strong> ${item.requisito}</div>`;
       }
 
       card.innerHTML = `
