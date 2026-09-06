@@ -627,8 +627,8 @@ select:focus {
 
 .pericia-div5 {
   font-size: 11px;
-  font-weight: 900;
-  color: #a02020;
+  font-weight: 800;
+  color: #111111;
   text-align: center;
   white-space: nowrap;
   user-select: none;
@@ -1633,6 +1633,6 @@ body.dark-theme .modal-list-item-btn:hover {
 }
 
 body.dark-theme .pericia-div5 {
-  color: #ff7878;
+  color: #fbfbf8;
 }
 
