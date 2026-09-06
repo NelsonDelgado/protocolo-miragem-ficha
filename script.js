@@ -25,7 +25,7 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-import { REGRAS } from "./regras.js?v=25";
+import { REGRAS } from "./regras.js?v=26";
 
 const firebaseConfig = {
   // Dados de autenticacao firebase
@@ -1147,6 +1147,7 @@ if (formFicha) {
       if (t.tipo === "ferimento") badge = "Ferimento Grave";
       else if (t.tipo === "mania") badge = "Mania";
       else if (t.tipo === "fobia") badge = "Fobia";
+      else if (t.tipo === "maldicao") badge = "Maldição do Véu";
       else badge = "Fobia/Mania";
       const desc = t.efeito || t.descricao || "";
 
@@ -1393,26 +1394,31 @@ if (formFicha) {
     if (!modal) return;
 
     searchInput.value = "";
-    searchInput.placeholder = "Fobia/Mania, Ferimento Habilidade, Poder, Ritual";
+    searchInput.placeholder = "Fobia, Mania, Ferimento, Maldição, Habilidade, Poder, Ritual";
     filterSelect.innerHTML = '<option value="">Todos</option>';
     
-    if (tipo === "fobia" || tipo === "mania") {
-      title.textContent = tipo === "fobia" ? "Adicionar Fobia" : "Adicionar Mania";
+    if (tipo === "fobia" || tipo === "mania" || tipo === "ferimento" || tipo === "maldicao") {
+      if (tipo === "fobia") title.textContent = "Adicionar Fobia";
+      else if (tipo === "mania") title.textContent = "Adicionar Mania";
+      else if (tipo === "ferimento") title.textContent = "Adicionar Ferimento Grave";
+      else if (tipo === "maldicao") title.textContent = "Adicionar Maldição do Véu";
+
       filterSelect.style.display = "block";
-      const fobiaOptions = [
+      filterSelect.innerHTML = "";
+      const traumaOptions = [
+        { val: "todas", label: "Todas as Opções" },
         { val: "fobia", label: "Fobias" },
-        { val: "mania", label: "Manias" }
+        { val: "mania", label: "Manias" },
+        { val: "ferimento", label: "Ferimentos Graves" },
+        { val: "maldicao", label: "Maldições do Véu" }
       ];
-      fobiaOptions.forEach(optData => {
+      traumaOptions.forEach(optData => {
         const opt = document.createElement("option");
         opt.value = optData.val;
         opt.textContent = optData.label;
         filterSelect.appendChild(opt);
       });
       filterSelect.value = tipo;
-    } else if (tipo === "ferimento") {
-      title.textContent = "Adicionar Ferimento Grave";
-      filterSelect.style.display = "none";
     } else if (tipo === "habilidade") {
       title.textContent = "Adicionar Habilidade";
       filterSelect.style.display = "block";
@@ -1469,7 +1475,7 @@ if (formFicha) {
 
     const btnCustom = document.getElementById("modal-selecao-btn-custom");
     if (btnCustom) {
-      if (["fobia", "mania", "ferimento", "habilidade", "poder", "ritual"].includes(tipo)) {
+      if (["fobia", "mania", "ferimento", "maldicao", "habilidade", "poder", "ritual"].includes(tipo)) {
         btnCustom.style.display = "flex";
         btnCustom.textContent = tipo === "ritual"
           ? "+ Criar Ritual Próprio"
@@ -1477,10 +1483,12 @@ if (formFicha) {
             ? "+ Criar Habilidade Própria"
             : (tipo === "poder"
               ? "+ Criar Poder Próprio"
-              : "+ Criar Próprio"));
+              : (tipo === "maldicao"
+                ? "+ Criar Maldição Própria"
+                : "+ Criar Próprio")));
         btnCustom.onclick = () => {
           modal.classList.add("hidden");
-          if (tipo === "fobia" || tipo === "mania" || tipo === "ferimento") {
+          if (tipo === "fobia" || tipo === "mania" || tipo === "ferimento" || tipo === "maldicao") {
             abrirEditorTrauma(-1, tipo);
           } else if (tipo === "habilidade" || tipo === "poder") {
             abrirEditorHabilidadePoder(-1, tipo);
@@ -1522,37 +1530,56 @@ if (formFicha) {
 
     let items = [];
 
-    if (currentModalType === "fobia" || currentModalType === "mania") {
-      const mode = (filterVal === "fobia" || filterVal === "mania") ? filterVal : currentModalType;
+    if (currentModalType === "fobia" || currentModalType === "mania" || currentModalType === "ferimento" || currentModalType === "maldicao") {
+      const mode = (filterVal && ["fobia", "mania", "ferimento", "maldicao", "todas"].includes(filterVal)) ? filterVal : currentModalType;
       const modalTitle = document.getElementById("modal-selecao-title");
       if (modalTitle) {
-        modalTitle.textContent = mode === "mania" ? "Adicionar Mania" : "Adicionar Fobia";
+        if (mode === "mania") modalTitle.textContent = "Adicionar Mania";
+        else if (mode === "ferimento") modalTitle.textContent = "Adicionar Ferimento Grave";
+        else if (mode === "maldicao") modalTitle.textContent = "Adicionar Maldição do Véu";
+        else if (mode === "todas") modalTitle.textContent = "Adicionar Fobia, Mania, Ferimento ou Maldição";
+        else modalTitle.textContent = "Adicionar Fobia";
       }
-      if (mode === "mania") {
-        items = REGRAS.fobias.map(f => ({
-          id: f.id,
-          nome: f.mania,
-          descricao: f.mania_desc,
-          detalhes: `Mania (d100: #${f.id})`,
-          tipo: "mania",
-          type: "mania"
-        }));
-      } else {
-        items = REGRAS.fobias.map(f => ({
-          id: f.id,
-          nome: f.fobia,
-          descricao: f.fobia_desc,
-          detalhes: `Fobia (d100: #${f.id})`,
-          tipo: "fobia",
-          type: "fobia"
-        }));
-      }
-    } else if (currentModalType === "ferimento") {
-      items = REGRAS.ferimentos.map(f => ({
+
+      const fobiaList = (REGRAS.fobias || []).map(f => ({
+        id: f.id,
+        nome: f.fobia,
+        descricao: f.fobia_desc,
+        detalhes: `Fobia (d100: #${f.id})`,
+        tipo: "fobia",
+        type: "fobia"
+      }));
+
+      const maniaList = (REGRAS.fobias || []).map(f => ({
+        id: f.id,
+        nome: f.mania,
+        descricao: f.mania_desc,
+        detalhes: `Mania (d100: #${f.id})`,
+        tipo: "mania",
+        type: "mania"
+      }));
+
+      const ferimentoList = (REGRAS.ferimentos || []).map(f => ({
         ...f,
         detalhes: `Ferimento Grave (d100: #${f.id})`,
+        tipo: "ferimento",
         type: "ferimento"
       }));
+
+      const maldicaoList = (REGRAS.maldicoes || []).map(m => ({
+        id: m.id,
+        nome: m.nome,
+        descricao: m.efeito || m.desc,
+        detalhes: `Maldição do Véu (d100: #${m.id})`,
+        tipo: "maldicao",
+        type: "maldicao"
+      }));
+
+      if (mode === "mania") items = maniaList;
+      else if (mode === "ferimento") items = ferimentoList;
+      else if (mode === "maldicao") items = maldicaoList;
+      else if (mode === "todas") items = [...fobiaList, ...maniaList, ...ferimentoList, ...maldicaoList];
+      else items = fobiaList;
     } else if (currentModalType === "habilidade") {
       items = REGRAS.habilidades.map(h => ({ ...h, type: "habilidade" }));
       if (filterVal) {
@@ -1671,7 +1698,7 @@ if (formFicha) {
   function adicionarItem(item) {
     if (isReadOnly || !agenteAtual) return;
 
-    if (currentModalType === "fobia" || currentModalType === "mania" || currentModalType === "ferimento") {
+    if (currentModalType === "fobia" || currentModalType === "mania" || currentModalType === "ferimento" || currentModalType === "maldicao") {
       if (!Array.isArray(agenteAtual.perfil.traumas)) agenteAtual.perfil.traumas = [];
       const itemTipo = item.tipo || item.type || currentModalType;
       agenteAtual.perfil.traumas.push({
@@ -1951,21 +1978,22 @@ if (formFicha) {
 
     const itemTipo = item.tipo || item.type || defaultTipo || "fobia";
     if (title) {
-      title.textContent = isNew ? "Adicionar Trauma Personalizado" : "Editar Trauma (Fobia/Mania/Ferimento)";
+      title.textContent = isNew ? "Adicionar Trauma ou Maldição" : "Editar (Fobia / Mania / Ferimento / Maldição)";
     }
 
     fields.innerHTML = `
       <div class="item-editor-group">
-        <label for="editor-trauma-tipo">Tipo de Trauma:</label>
+        <label for="editor-trauma-tipo">Tipo:</label>
         <select id="editor-trauma-tipo">
           <option value="fobia" ${itemTipo === "fobia" ? "selected" : ""}>Fobia</option>
           <option value="mania" ${itemTipo === "mania" ? "selected" : ""}>Mania</option>
           <option value="ferimento" ${itemTipo === "ferimento" ? "selected" : ""}>Ferimento Grave</option>
+          <option value="maldicao" ${itemTipo === "maldicao" ? "selected" : ""}>Maldição do Véu</option>
         </select>
       </div>
       <div class="item-editor-group">
         <label for="editor-trauma-nome">Nome / Título:</label>
-        <input type="text" id="editor-trauma-nome" value="${escapeHtml(item.nome || "")}" placeholder="Ex: Claustrofobia, Tique Nervoso, Fratura Exposta..." required />
+        <input type="text" id="editor-trauma-nome" value="${escapeHtml(item.nome || "")}" placeholder="Ex: Claustrofobia, Fratura Exposta, Maldição Vampiresca..." required />
       </div>
       <div class="item-editor-group">
         <label for="editor-trauma-efeito">Efeito / Descrição:</label>
@@ -2347,6 +2375,7 @@ if (formFicha) {
     const addFobia = document.getElementById("btn-add-fobia");
     const addMania = document.getElementById("btn-add-mania");
     const addFerimento = document.getElementById("btn-add-ferimento");
+    const addMaldicao = document.getElementById("btn-add-maldicao");
     
     const addHabilidade = document.getElementById("btn-add-habilidade");
     const addPoder = document.getElementById("btn-add-poder");
@@ -2356,6 +2385,7 @@ if (formFicha) {
     if (addFobia) addFobia.onclick = () => abrirModalSelecao("fobia");
     if (addMania) addMania.onclick = () => abrirModalSelecao("mania");
     if (addFerimento) addFerimento.onclick = () => abrirModalSelecao("ferimento");
+    if (addMaldicao) addMaldicao.onclick = () => abrirModalSelecao("maldicao");
     
     if (addHabilidade) addHabilidade.onclick = () => abrirModalSelecao("habilidade");
     if (addPoder) addPoder.onclick = () => abrirModalSelecao("poder");
