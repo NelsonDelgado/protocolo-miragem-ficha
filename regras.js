@@ -1102,7 +1102,7 @@ export const REGRAS = {
       categoria: "Banda",
       custo: "1 Reação + 1 PD",
       requisito: "Habilidade de Banda (2 pessoas por vez)",
-      descricao: "Essa habilidade pode ser escolhida uma vez por pessoa, e o efeito é compartilhado por todos e somente os que tiverem essa habilidade. Essa habilidade de banda só tem efeito em duas pessoas por vez. Enquanto você e seu "irmão" estiverem em combate contra o mesmo alvo, sempre que um dos dois fizer um ataque, o outro pode gastar sua reação e 1 PD para fazer um ataque em seguida. Se errar esse ataque, não considere a reação gasta, mas ainda considere o custo do PD. Se seu parceiro morrer, você leva 1d4 + Humanidade de dano de PD permanente.",
+      descricao: "Essa habilidade pode ser escolhida uma vez por pessoa, e o efeito é compartilhado por todos e somente os que tiverem essa habilidade. Essa habilidade de banda só tem efeito em duas pessoas por vez. Enquanto você e seu 'irmão' estiverem em combate contra o mesmo alvo, sempre que um dos dois fizer um ataque, o outro pode gastar sua reação e 1 PD para fazer um ataque em seguida. Se errar esse ataque, não considere a reação gasta, mas ainda considere o custo do PD. Se seu parceiro morrer, você leva 1d4 + Humanidade de dano de PD permanente.",
     },
     {
       id: "greyscale",
@@ -3420,7 +3420,7 @@ export const REGRAS = {
       target: "1 objeto de até 5 kg",
       duracao: "Indeterminado",
       resistencia: "Vontade anula",
-      desc: "Você toca um objeto e conecta sua consciência a ele enquanto grava um símbolo em alguma parte de sua superfície. Enquanto tiver esse objeto, sua consciência é considerada "imortal", fazendo com que se seu corpo morrer, é apenas necessário que alguém utilize o objeto para que sua consciência seja enviada para o novo corpo. Utilizar o objeto pode ser tanto vesti-lo, quanto realmente usar ele. Se o alvo for uma pessoa consciente, ela pode fazer um teste de Vontade sempre que usar o objeto; se falhar, sua consciência é tomada pela de quem conjurou o ritual. Se passar, nada acontece. Se o alvo for uma pessoa inconsciente ou um corpo morto em bom estado, nenhum teste é necessário. Esse ritual só tem efeito se você estiver morto. Se o objeto que contém sua consciência for destruído, ela vai junto. Genuíno (+10 PD): Muda o alvo para "1 aliado disposto e 1 objeto de até 5 kg". O efeito funciona como antes, porém ao invés de ser sua consciência, é a do aliado.",
+      desc: "Você toca um objeto e conecta sua consciência a ele enquanto grava um símbolo em alguma parte de sua superfície. Enquanto tiver esse objeto, sua consciência é considerada 'imortal', fazendo com que se seu corpo morrer, é apenas necessário que alguém utilize o objeto para que sua consciência seja enviada para o novo corpo. Utilizar o objeto pode ser tanto vesti-lo, quanto realmente usar ele. Se o alvo for uma pessoa consciente, ela pode fazer um teste de Vontade sempre que usar o objeto; se falhar, sua consciência é tomada pela de quem conjurou o ritual. Se passar, nada acontece. Se o alvo for uma pessoa inconsciente ou um corpo morto em bom estado, nenhum teste é necessário. Esse ritual só tem efeito se você estiver morto. Se o objeto que contém sua consciência for destruído, ela vai junto. Genuíno (+10 PD): Muda o alvo para '1 aliado disposto e 1 objeto de até 5 kg'. O efeito funciona como antes, porém ao invés de ser sua consciência, é a do aliado.",
     },
     {
       id: "trilha_sonora",
@@ -3504,7 +3504,7 @@ export const REGRAS = {
       target: "1 Ser",
       duracao: "Cena",
       resistencia: "Fortitude Parcial / Anula",
-      desc: "Diversos fios saem de seus dedos e vão em direção a um alvo. O alvo deve fazer um teste de Fortitude e no começo de cada turno pode fazer o teste novamente. Se tiver dois sucessos seguidos, independente do nível de sucesso, o efeito e ritual acabam. Dependendo do nível de sucesso ou falha: Falha Crítica: Paralisado; Falha Normal: Agarrado; Sucesso Normal: Imóvel; Sucesso Bom: Lento; Sucesso Extremo: Nada. Melhorado (+3 PV): Muda o alcance para Médio. Genuíno (+7 PV): Como melhorado, mas aumenta o alvo para "Seres escolhidos".",
+      desc: "Diversos fios saem de seus dedos e vão em direção a um alvo. O alvo deve fazer um teste de Fortitude e no começo de cada turno pode fazer o teste novamente. Se tiver dois sucessos seguidos, independente do nível de sucesso, o efeito e ritual acabam. Dependendo do nível de sucesso ou falha: Falha Crítica: Paralisado; Falha Normal: Agarrado; Sucesso Normal: Imóvel; Sucesso Bom: Lento; Sucesso Extremo: Nada. Melhorado (+3 PV): Muda o alcance para Médio. Genuíno (+7 PV): Como melhorado, mas aumenta o alvo para 'Seres escolhidos'.",
     },
     {
       id: "guia_decepada",
@@ -3530,7 +3530,7 @@ export const REGRAS = {
       resistencia: "-",
       desc: "Você toca um objeto e o grava com uma runa. Um objeto só pode ter uma runa por vez: • Runa do Sigilo: Qualquer texto escrito no objeto ou pelo objeto só pode ser lido por quem for escolhido pelo conjurador. • Runa do Fardo: O objeto não pode ser empunhado por ninguém além do conjurador e se não estiver em suas mãos, pode fazer com que esteja como ação livre. • Runa da Dor: Se o objeto for arremessado ou atirado em alguém, a margem de sucesso extremo aumenta em +2 e o dano em +1 dado do mesmo tipo. • Runa da Pele: Se o objeto for vestido por alguém, ganha +1,5m em deslocamento e +2 RD. • Runa do Esquecimento: Se o objeto for vestido por alguém, seu rosto se torna irreconhecível. • Runa do Tempo: Você pode escolher destruir o objeto com essa runa, fazendo com que o tempo volte atrás em 5 minutos (só o conjurador pode fazer essa ação e só ele lembra). • Runa da Praga: Ao marcar, escolha 3 condições (exceto Morrendo e Enlouquecendo); quem portar o objeto se torna imune a elas.",
     },
-  ]
+  ],
 
   itensAmaldicoados: [
     {
