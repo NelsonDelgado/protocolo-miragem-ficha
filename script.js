@@ -294,7 +294,133 @@ function combinarEstruturaPadrao(padrao, agente) {
 
 function normalizarAgente(agente) {
   const nome = agente && agente.identidade ? agente.identidade.nome : "";
-  return combinarEstruturaPadrao(criarAgenteEmBranco(nome), agente || {});
+  const combinado = combinarEstruturaPadrao(criarAgenteEmBranco(nome), agente || {});
+
+  // Compatibilidade retroativa com fichas antigas (onde campos eram texto puro ou arrays de strings):
+  
+  // 1. Traumas Clínicos (Fobias, Manias, Ferimentos, Maldições)
+  if (typeof combinado.perfil?.traumas === "string") {
+    const raw = combinado.perfil.traumas.trim();
+    if (raw) {
+      const linhas = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      combinado.perfil.traumas = linhas.map((linha, idx) => {
+        const partes = linha.split(/:\s*(.+)/);
+        return {
+          id: Date.now() + idx,
+          nome: partes[0] ? partes[0].trim() : linha,
+          tipo: "fobia",
+          efeito: partes[1] ? partes[1].trim() : "",
+        };
+      });
+    } else {
+      combinado.perfil.traumas = [];
+    }
+  } else if (Array.isArray(combinado.perfil?.traumas)) {
+    combinado.perfil.traumas = combinado.perfil.traumas.map((t, idx) => {
+      if (typeof t === "string") {
+        const partes = t.split(/:\s*(.+)/);
+        return {
+          id: Date.now() + idx,
+          nome: partes[0] ? partes[0].trim() : t,
+          tipo: "fobia",
+          efeito: partes[1] ? partes[1].trim() : "",
+        };
+      }
+      return t;
+    });
+  } else {
+    combinado.perfil.traumas = [];
+  }
+
+  // 2. Habilidades e Poderes
+  if (typeof combinado.habilidades?.lista === "string") {
+    const raw = combinado.habilidades.lista.trim();
+    if (raw) {
+      const blocos = raw.split(/\r?\n(?=[A-Za-z0-9À-ÿ])/);
+      combinado.habilidades.lista = blocos.map((bloco, idx) => {
+        const partes = bloco.split(/:\s*(.+)/s);
+        const nome = partes[0] ? partes[0].trim() : `Habilidade ${idx + 1}`;
+        const desc = partes[1] ? partes[1].trim() : bloco.trim();
+        return {
+          id: Date.now() + idx,
+          nome: nome,
+          tipo: "habilidade",
+          categoria: "Geral",
+          custo: "-",
+          requisito: "-",
+          descricao: desc,
+        };
+      });
+    } else {
+      combinado.habilidades.lista = [];
+    }
+  } else if (Array.isArray(combinado.habilidades?.lista)) {
+    combinado.habilidades.lista = combinado.habilidades.lista.map((h, idx) => {
+      if (typeof h === "string") {
+        const partes = h.split(/:\s*(.+)/s);
+        return {
+          id: Date.now() + idx,
+          nome: partes[0] ? partes[0].trim() : h,
+          tipo: "habilidade",
+          categoria: "Geral",
+          custo: "-",
+          requisito: "-",
+          descricao: partes[1] ? partes[1].trim() : h,
+        };
+      }
+      return h;
+    });
+  } else {
+    combinado.habilidades.lista = [];
+  }
+
+  // 3. Rituais
+  if (typeof combinado.habilidades?.rituais === "string") {
+    const raw = combinado.habilidades.rituais.trim();
+    if (raw) {
+      const blocos = raw.split(/\r?\n(?=[A-Za-z0-9À-ÿ])/);
+      combinado.habilidades.rituais = blocos.map((bloco, idx) => {
+        const partes = bloco.split(/:\s*(.+)/s);
+        const nome = partes[0] ? partes[0].trim() : `Ritual ${idx + 1}`;
+        const desc = partes[1] ? partes[1].trim() : bloco.trim();
+        return {
+          id: Date.now() + idx,
+          nome: nome,
+          circulo: "1º Círculo",
+          aspecto: "Geral",
+          custo: "-",
+          alc: "-",
+          target: "-",
+          duracao: "-",
+          desc: desc,
+        };
+      });
+    } else {
+      combinado.habilidades.rituais = [];
+    }
+  } else if (Array.isArray(combinado.habilidades?.rituais)) {
+    combinado.habilidades.rituais = combinado.habilidades.rituais.map((r, idx) => {
+      if (typeof r === "string") {
+        const partes = r.split(/:\s*(.+)/s);
+        return {
+          id: Date.now() + idx,
+          nome: partes[0] ? partes[0].trim() : r,
+          circulo: "1º Círculo",
+          aspecto: "Geral",
+          custo: "-",
+          alc: "-",
+          target: "-",
+          duracao: "-",
+          desc: partes[1] ? partes[1].trim() : r,
+        };
+      }
+      return r;
+    });
+  } else {
+    combinado.habilidades.rituais = [];
+  }
+
+  return combinado;
 }
 
 // ==========================================
