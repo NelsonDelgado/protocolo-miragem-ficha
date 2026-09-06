@@ -1341,6 +1341,7 @@ if (formFicha) {
     if (!modal) return;
 
     searchInput.value = "";
+    searchInput.placeholder = "Fobia/Mania, Ferimento Habilidade, Poder, Ritual";
     filterSelect.innerHTML = '<option value="">Todos</option>';
     
     if (tipo === "fobia" || tipo === "mania") {
