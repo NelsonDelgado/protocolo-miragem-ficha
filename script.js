@@ -1442,10 +1442,26 @@ if (formFicha) {
 
     filtrarItensModal();
     modal.classList.remove("hidden");
+    setTimeout(() => {
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+      }
+    }, 60);
   };
 
+  function normalizarTexto(str) {
+    if (!str) return "";
+    return String(str)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+  }
+
   function filtrarItensModal() {
-    const queryStr = document.getElementById("modal-selecao-search")?.value.toLowerCase() || "";
+    const searchInput = document.getElementById("modal-selecao-search");
+    const rawQuery = searchInput?.value || "";
     const filterVal = document.getElementById("modal-selecao-filter")?.value || "";
     const body = document.getElementById("modal-selecao-body");
     if (!body) return;
@@ -1520,17 +1536,39 @@ if (formFicha) {
       items = REGRAS.veiculos.map(v => ({ ...v, type: "veiculo" }));
     }
 
-    if (queryStr) {
+    const queryNorm = normalizarTexto(rawQuery);
+    if (queryNorm) {
+      const termos = queryNorm.split(/\s+/).filter(Boolean);
       items = items.filter(item => {
-        const n = (item.nome || "").toLowerCase();
-        const d = (item.descricao || item.desc || item.efeito || "").toLowerCase();
-        const det = (item.detalhes || "").toLowerCase();
-        return n.includes(queryStr) || d.includes(queryStr) || det.includes(queryStr);
+        const pool = normalizarTexto([
+          item.nome,
+          item.descricao,
+          item.desc,
+          item.efeito,
+          item.detalhes,
+          item.categoria,
+          item.vertente,
+          item.circulo,
+          item.aspecto,
+          item.custo,
+          item.requisito,
+          item.afinidade,
+          item.tipo,
+          item.type,
+          item.id != null ? `${item.id} #${item.id}` : ""
+        ].filter(Boolean).join(" "));
+
+        return termos.every(termo => pool.includes(termo));
       });
     }
 
     if (items.length === 0) {
-      body.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">Nenhum item encontrado.</p>';
+      body.innerHTML = `
+        <div style="text-align: center; padding: 28px 12px; color: var(--muted);">
+          <p style="font-size: 14px; margin: 0 0 6px 0;">Nenhum item encontrado para <strong>"${escapeHtml(rawQuery)}"</strong>.</p>
+          <p style="font-size: 12px; font-style: italic; margin: 0;">Podes usar o botão <strong>"+ Criar Próprio"</strong> acima para adicionares o teu próprio item!</p>
+        </div>
+      `;
       return;
     }
 
@@ -2289,10 +2327,10 @@ if (formFicha) {
     const searchInput = document.getElementById("modal-selecao-search");
     const filterSelect = document.getElementById("modal-selecao-filter");
     if (searchInput) {
-      searchInput.addEventListener("input", () => filtrarItensModal());
+      searchInput.oninput = () => filtrarItensModal();
     }
     if (filterSelect) {
-      filterSelect.addEventListener("change", () => filtrarItensModal());
+      filterSelect.onchange = () => filtrarItensModal();
     }
   };
 

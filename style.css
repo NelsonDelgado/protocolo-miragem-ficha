@@ -1286,17 +1286,52 @@ input[type="number"]::-webkit-outer-spin-button {
 .modal-filters {
   display: flex;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  align-items: center;
 }
 
-.modal-filters input {
+.modal-filters input,
+#modal-selecao-search {
   flex: 2;
-  min-height: 32px;
+  min-height: 38px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  border: 2px solid #222222;
+  background-color: #ffffff !important;
+  color: #111111 !important;
+  caret-color: #111111 !important;
+  border-radius: 4px;
+  outline: none;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.modal-filters select {
+.modal-filters input:focus,
+#modal-selecao-search:focus {
+  border-color: #1976d2 !important;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.25) !important;
+}
+
+.modal-filters input::placeholder,
+#modal-selecao-search::placeholder {
+  color: #666666;
+  opacity: 1;
+}
+
+.modal-filters select,
+#modal-selecao-filter {
   flex: 1;
-  min-height: 32px;
+  min-height: 38px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  border: 2px solid #222222;
+  background-color: #ffffff !important;
+  color: #111111 !important;
+  border-radius: 4px;
 }
 
 .modal-body {
@@ -1734,5 +1769,34 @@ body.dark-theme .item-editor-group textarea {
 
 body.dark-theme .item-editor-footer {
   border-top-color: #444444;
+}
+
+/* Modo escuro para barra de pesquisa e filtros do modal */
+body.dark-theme .modal-filters input,
+body.dark-theme #modal-selecao-search {
+  background-color: #1a1a1a !important;
+  color: #ffffff !important;
+  caret-color: #ffffff !important;
+  border-color: #666666 !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6) !important;
+}
+
+body.dark-theme .modal-filters input:focus,
+body.dark-theme #modal-selecao-search:focus {
+  border-color: #64b5f6 !important;
+  box-shadow: 0 0 0 3px rgba(100, 181, 246, 0.35) !important;
+}
+
+body.dark-theme .modal-filters input::placeholder,
+body.dark-theme #modal-selecao-search::placeholder {
+  color: #aaaaaa;
+  opacity: 1;
+}
+
+body.dark-theme .modal-filters select,
+body.dark-theme #modal-selecao-filter {
+  background-color: #1a1a1a !important;
+  color: #ffffff !important;
+  border-color: #666666 !important;
 }
 
