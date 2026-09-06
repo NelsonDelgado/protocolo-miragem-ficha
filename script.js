@@ -803,86 +803,145 @@ function renderizarUiAgentes() {
     return;
   }
 
-  // Memoriza qual input de PV/PD estava focado para não interromper a digitação do mestre
-  const focusedId =
-    document.activeElement &&
-    document.activeElement.id &&
-    document.activeElement.id.startsWith("mc-input-")
-      ? document.activeElement.id
-      : null;
-  const selStart = focusedId ? document.activeElement.selectionStart : null;
-  const selEnd = focusedId ? document.activeElement.selectionEnd : null;
+  // 1. Renderiza lista de agentes normal na tela da campanha apenas quando necessário
+  const existingAgentCards = listaDiv.querySelectorAll(".agent-card");
+  let needsListaRerender = existingAgentCards.length !== cacheAgentesCampanha.size;
+  if (!needsListaRerender) {
+    for (const [docId] of cacheAgentesCampanha) {
+      if (!document.getElementById(`agent-card-item-${docId}`)) {
+        needsListaRerender = true;
+        break;
+      }
+    }
+  }
 
-  // 1. Renderiza lista de agentes normal na tela da campanha
-  listaDiv.className = "agents-grid";
-  listaDiv.innerHTML = "";
+  if (needsListaRerender) {
+    listaDiv.className = "agents-grid";
+    listaDiv.innerHTML = "";
 
-  cacheAgentesCampanha.forEach((agente, agenteDocId) => {
-    const wrapper = document.createElement("div");
-    wrapper.className = "agent-card";
+    cacheAgentesCampanha.forEach((agente, agenteDocId) => {
+      const wrapper = document.createElement("div");
+      wrapper.className = "agent-card";
+      wrapper.id = `agent-card-item-${agenteDocId}`;
 
-    const isOwner = currentUser && agente.userId === currentUser.uid;
-    const canEdit = isOwner || isCurrentUserMaster;
+      const isOwner = currentUser && agente.userId === currentUser.uid;
+      const canEdit = isOwner || isCurrentUserMaster;
 
-    const fotoHtml =
-      agente.perfil && agente.perfil.foto_img
-        ? `<img src="${agente.perfil.foto_img}" alt="Foto de ${agente.identidade ? agente.identidade.nome : 'Agente'}">`
-        : `<div style="color: #666; font-size: 11px; text-transform: uppercase; text-align: center; padding: 10px;">Sem Foto</div>`;
+      const fotoHtml =
+        agente.perfil && agente.perfil.foto_img
+          ? `<img src="${agente.perfil.foto_img}" alt="Foto de ${agente.identidade ? agente.identidade.nome : 'Agente'}">`
+          : `<div style="color: #666; font-size: 11px; text-transform: uppercase; text-align: center; padding: 10px;">Sem Foto</div>`;
 
-    const deleteButtonHtml = canEdit
-      ? `<button class="agent-card-settings" onclick="deletarPersonagem('${agenteDocId}')" title="Apagar Agente">⚙️</button>`
-      : "";
+      const deleteButtonHtml = canEdit
+        ? `<button class="agent-card-settings" onclick="deletarPersonagem('${agenteDocId}')" title="Apagar Agente">⚙️</button>`
+        : "";
 
-    const acessarButtonHtml = canEdit
-      ? `<button class="agent-card-btn" onclick="abrirFicha('${agenteDocId}', true)">Acessar Ficha</button>`
-      : `<button class="agent-card-btn" style="background: #444; color: #888; cursor: not-allowed;" disabled title="Acesso Restrito">Ficha Privada</button>`;
+      const acessarButtonHtml = canEdit
+        ? `<button class="agent-card-btn" onclick="abrirFicha('${agenteDocId}', true)">Acessar Ficha</button>`
+        : `<button class="agent-card-btn" style="background: #444; color: #888; cursor: not-allowed;" disabled title="Acesso Restrito">Ficha Privada</button>`;
 
-    const dataReg =
-      agente.id && !isNaN(Number(agente.id))
-        ? new Date(Number(agente.id)).toLocaleDateString("pt-BR")
-        : "Data indisponível";
+      const dataReg =
+        agente.id && !isNaN(Number(agente.id))
+          ? new Date(Number(agente.id)).toLocaleDateString("pt-BR")
+          : "Data indisponível";
 
-    wrapper.innerHTML = `
-        <div class="agent-card-left">${fotoHtml}</div>
-        <div class="agent-card-right">
-          ${deleteButtonHtml}
-          <h4 class="agent-card-name">${agente.identidade?.nome || "Desconhecido"}</h4>
-          <p class="agent-card-role">${agente.identidade?.ocupacao || "Sem Ocupação"}</p>
-          <p class="agent-card-date">Registrado em ${dataReg}</p>
-          <div class="simple-card-actions">
-            ${acessarButtonHtml}
+      wrapper.innerHTML = `
+          <div class="agent-card-left">${fotoHtml}</div>
+          <div class="agent-card-right">
+            ${deleteButtonHtml}
+            <h4 class="agent-card-name">${agente.identidade?.nome || "Desconhecido"}</h4>
+            <p class="agent-card-role">${agente.identidade?.ocupacao || "Sem Ocupação"}</p>
+            <p class="agent-card-date">Registrado em ${dataReg}</p>
+            <div class="simple-card-actions">
+              ${acessarButtonHtml}
+            </div>
           </div>
-        </div>
-      `;
-    listaDiv.appendChild(wrapper);
-  });
+        `;
+      listaDiv.appendChild(wrapper);
+    });
+  }
 
   // 2. Renderiza os cartões dentro do Escudo do Mestre
   if (escudoMestreContent) {
-    escudoMestreContent.innerHTML = "";
-    if (isCurrentUserMaster) {
-      cacheAgentesCampanha.forEach((agente, agenteDocId) => {
-        const attr = agente.atributos || {};
-        const st = agente.status || {};
-        const ident = agente.identidade || {};
-        const comb = agente.combate || {};
+    if (!isCurrentUserMaster) {
+      escudoMestreContent.innerHTML = "";
+      return;
+    }
 
-        const pvMax = Number(st.pv_max) || 1;
-        const pvCurrent = Number(st.pv) || 0;
-        const pvPerc = Math.min(100, Math.max(0, (pvCurrent / pvMax) * 100));
-        const isPvOver = st.pv_max > 0 && pvCurrent > st.pv_max;
-        const pvOverText = isPvOver ? ` <span style="color:#ffd700; font-size:11px; text-shadow:0 0 3px #000;">(+${pvCurrent - st.pv_max})</span>` : "";
+    // Remove cartões de agentes removidos
+    const existingMasterCards = escudoMestreContent.querySelectorAll(".master-card");
+    existingMasterCards.forEach((card) => {
+      const cardDocId = card.id.replace("master-card-", "");
+      if (!cacheAgentesCampanha.has(cardDocId)) {
+        card.remove();
+      }
+    });
 
-        const pdMax = Number(st.pd_max) || 1;
-        const pdCurrent = Number(st.pd) || 0;
-        const pdPerc = Math.min(100, Math.max(0, (pdCurrent / pdMax) * 100));
+    cacheAgentesCampanha.forEach((agente, agenteDocId) => {
+      const attr = agente.atributos || {};
+      const st = agente.status || {};
+      const ident = agente.identidade || {};
+      const comb = agente.combate || {};
 
+      const maxValPv = Number(st.pv_max) || 0;
+      const pvMax = maxValPv > 0 ? maxValPv : 1;
+      const pvCurrent = Number(st.pv) || 0;
+      const pvPerc = Math.min(100, Math.max(0, (pvCurrent / pvMax) * 100));
+      const isPvOver = maxValPv > 0 && pvCurrent > maxValPv;
+      const pvOverText = isPvOver
+        ? ` <span style="color:#ffd700; font-size:11px; text-shadow:0 0 3px #000;">(+${pvCurrent - maxValPv})</span>`
+        : "";
+
+      const maxValPd = Number(st.pd_max) || 0;
+      const pdMax = maxValPd > 0 ? maxValPd : 1;
+      const pdCurrent = Number(st.pd) || 0;
+      const pdPerc = Math.min(100, Math.max(0, (pdCurrent / pdMax) * 100));
+      const isPdOver = maxValPd > 0 && pdCurrent > maxValPd;
+      const pdOverText = isPdOver
+        ? ` <span style="color:#00ffff; font-size:11px; text-shadow:0 0 3px #000;">(+${pdCurrent - maxValPd})</span>`
+        : "";
+
+      let masterCard = document.getElementById(`master-card-${agenteDocId}`);
+
+      if (masterCard) {
+        // Atualiza in-place para não destruir o DOM nem congelar o browser
+        const pvFill = masterCard.querySelector(".pv-fill");
+        if (pvFill) {
+          pvFill.style.width = `${pvPerc}%`;
+          if (isPvOver) pvFill.classList.add("pv-overheal");
+          else pvFill.classList.remove("pv-overheal");
+        }
+        const pvText = masterCard.querySelector(".mc-bar-text-pv");
+        if (pvText) {
+          pvText.innerHTML = `${pvCurrent} / ${st.pv_max || 0}${pvOverText}`;
+        }
+        const pvInput = masterCard.querySelector(`#mc-input-pv-${agenteDocId}`);
+        if (pvInput && document.activeElement !== pvInput) {
+          pvInput.value = pvCurrent;
+        }
+
+        const pdFill = masterCard.querySelector(".pd-fill");
+        if (pdFill) {
+          pdFill.style.width = `${pdPerc}%`;
+          if (isPdOver) pdFill.classList.add("pd-overheal");
+          else pdFill.classList.remove("pd-overheal");
+        }
+        const pdText = masterCard.querySelector(".mc-bar-text-pd");
+        if (pdText) {
+          pdText.innerHTML = `${pdCurrent} / ${st.pd_max || 0}${pdOverText}`;
+        }
+        const pdInput = masterCard.querySelector(`#mc-input-pd-${agenteDocId}`);
+        if (pdInput && document.activeElement !== pdInput) {
+          pdInput.value = pdCurrent;
+        }
+      } else {
+        // Cria novo card caso ainda não exista
         const fotoHtml =
           agente.perfil && agente.perfil.foto_img
             ? `<img src="${agente.perfil.foto_img}" alt="Foto de ${ident.nome || 'Agente'}">`
             : `<div style="color: #666; font-size: 11px; text-transform: uppercase; text-align: center; padding: 10px;">Sem Foto</div>`;
 
-        const masterCard = document.createElement("div");
+        masterCard = document.createElement("div");
         masterCard.className = "master-card";
         masterCard.id = `master-card-${agenteDocId}`;
 
@@ -909,7 +968,7 @@ function renderizarUiAgentes() {
                 <div class="mc-bar-label">VIDA</div>
                 <div class="mc-bar-bg">
                   <div class="mc-bar-fill pv-fill ${isPvOver ? "pv-overheal" : ""}" style="width: ${pvPerc}%"></div>
-                  <div class="mc-bar-text">${pvCurrent} / ${st.pv_max || 0}${pvOverText}</div>
+                  <div class="mc-bar-text mc-bar-text-pv">${pvCurrent} / ${st.pv_max || 0}${pvOverText}</div>
                 </div>
                 <div class="mc-bar-controls">
                   <button type="button" class="mc-ctrl-btn pv-sub-big" title="Tirar 5 PV" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pv', -5)">-5</button>
@@ -922,8 +981,8 @@ function renderizarUiAgentes() {
               <div class="mc-bar-container">
                 <div class="mc-bar-label">DETERMINAÇÃO</div>
                 <div class="mc-bar-bg">
-                  <div class="mc-bar-fill pd-fill" style="width: ${pdPerc}%"></div>
-                  <div class="mc-bar-text">${pdCurrent} / ${st.pd_max || 0}</div>
+                  <div class="mc-bar-fill pd-fill ${isPdOver ? "pd-overheal" : ""}" style="width: ${pdPerc}%"></div>
+                  <div class="mc-bar-text mc-bar-text-pd">${pdCurrent} / ${st.pd_max || 0}${pdOverText}</div>
                 </div>
                 <div class="mc-bar-controls">
                   <button type="button" class="mc-ctrl-btn pd-sub-big" title="Tirar 5 PD" onclick="alterarStatusAgenteMestre('${agenteDocId}', 'pd', -5)">-5</button>
@@ -944,21 +1003,8 @@ function renderizarUiAgentes() {
             </div>
         `;
         escudoMestreContent.appendChild(masterCard);
-      });
-
-      // Restaura o foco se o usuário estava com um input selecionado
-      if (focusedId) {
-        const inputEl = document.getElementById(focusedId);
-        if (inputEl) {
-          inputEl.focus();
-          if (selStart !== null && selEnd !== null) {
-            try {
-              inputEl.setSelectionRange(selStart, selEnd);
-            } catch (e) {}
-          }
-        }
       }
-    }
+    });
   }
 }
 
@@ -966,11 +1012,14 @@ function renderizarUiAgentes() {
 window.alterarStatusAgenteMestre = async (agenteDocId, statKey, delta) => {
   const agente = cacheAgentesCampanha.get(agenteDocId);
   if (!agente) return;
-  const st = agente.status || {};
-  const currentVal = Number(st[statKey]) || 0;
+  if (!agente.status) agente.status = {};
+  const currentVal = Number(agente.status[statKey]) || 0;
   let novoVal = currentVal + delta;
   if (novoVal < 0) novoVal = 0;
-  // Permite ultrapassar o limite maximo (ex: vida temporaria)
+
+  // Atualização imediata no cache local para resposta fluida sem congelamentos
+  agente.status[statKey] = novoVal;
+  renderizarUiAgentes();
 
   try {
     const agenteRef = doc(db, "agentes", String(agenteDocId));
@@ -990,7 +1039,11 @@ window.definirStatusAgenteMestre = async (agenteDocId, statKey, valorStr) => {
   if (isNaN(num)) return;
   let novoVal = num;
   if (novoVal < 0) novoVal = 0;
-  // Permite ultrapassar o limite maximo (ex: vida temporaria)
+
+  // Atualização imediata no cache local para resposta fluida sem congelamentos
+  if (!agente.status) agente.status = {};
+  agente.status[statKey] = novoVal;
+  renderizarUiAgentes();
 
   try {
     const agenteRef = doc(db, "agentes", String(agenteDocId));
