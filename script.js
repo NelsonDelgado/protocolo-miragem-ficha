@@ -25,7 +25,7 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-import { REGRAS } from "./regras.js?v=20";
+import { REGRAS } from "./regras.js?v=22";
 
 const firebaseConfig = {
   // Dados de autenticacao firebase
@@ -1328,8 +1328,19 @@ if (formFicha) {
     filterSelect.innerHTML = '<option value="">Todos</option>';
     
     if (tipo === "fobia") {
-      title.textContent = "Adicionar Fobia/Mania";
-      filterSelect.style.display = "none";
+      title.textContent = "Adicionar Fobia ou Mania";
+      filterSelect.style.display = "block";
+      const fobiaOptions = [
+        { val: "", label: "Todas (Fobias e Manias)" },
+        { val: "fobia", label: "Apenas Fobias" },
+        { val: "mania", label: "Apenas Manias" }
+      ];
+      fobiaOptions.forEach(optData => {
+        const opt = document.createElement("option");
+        opt.value = optData.val;
+        opt.textContent = optData.label;
+        filterSelect.appendChild(opt);
+      });
     } else if (tipo === "ferimento") {
       title.textContent = "Adicionar Ferimento Grave";
       filterSelect.style.display = "none";
@@ -1401,9 +1412,37 @@ if (formFicha) {
     let items = [];
 
     if (currentModalType === "fobia") {
-      items = REGRAS.fobias.map(f => ({ ...f, type: "fobia" }));
+      if (filterVal === "fobia") {
+        items = REGRAS.fobias.map(f => ({
+          id: f.id,
+          nome: f.fobia,
+          descricao: f.fobia_desc,
+          detalhes: `Fobia (d100: #${f.id})`,
+          type: "fobia"
+        }));
+      } else if (filterVal === "mania") {
+        items = REGRAS.fobias.map(f => ({
+          id: f.id,
+          nome: f.mania,
+          descricao: f.mania_desc,
+          detalhes: `Mania (d100: #${f.id})`,
+          type: "fobia"
+        }));
+      } else {
+        items = REGRAS.fobias.map(f => ({
+          id: f.id,
+          nome: f.nome,
+          descricao: f.descricao,
+          detalhes: `Fobia / Mania (d100: #${f.id})`,
+          type: "fobia"
+        }));
+      }
     } else if (currentModalType === "ferimento") {
-      items = REGRAS.ferimentos.map(f => ({ ...f, type: "ferimento" }));
+      items = REGRAS.ferimentos.map(f => ({
+        ...f,
+        detalhes: `Ferimento Grave (d100: #${f.id})`,
+        type: "ferimento"
+      }));
     } else if (currentModalType === "habilidade") {
       items = REGRAS.habilidades.map(h => ({ ...h, type: "habilidade" }));
       if (filterVal) {
@@ -1441,7 +1480,12 @@ if (formFicha) {
     }
 
     if (queryStr) {
-      items = items.filter(item => item.nome.toLowerCase().includes(queryStr));
+      items = items.filter(item => {
+        const n = (item.nome || "").toLowerCase();
+        const d = (item.descricao || item.desc || item.efeito || "").toLowerCase();
+        const det = (item.detalhes || "").toLowerCase();
+        return n.includes(queryStr) || d.includes(queryStr) || det.includes(queryStr);
+      });
     }
 
     if (items.length === 0) {
@@ -1471,6 +1515,8 @@ if (formFicha) {
         detailsStr = `Custo: ${item.preco} Créditos`;
       } else if (currentModalType === "veiculo") {
         detailsStr = `Tipo: ${item.tipo} | Velocidade: ${item.velocidade} | Custo: ${item.preco} Créditos`;
+      } else if (item.detalhes) {
+        detailsStr = item.detalhes;
       }
 
       row.innerHTML = `
@@ -1500,7 +1546,7 @@ if (formFicha) {
         nome: item.nome,
         type: currentModalType,
         tipo: currentModalType,
-        efeito: item.efeito || item.descricao || ""
+        efeito: item.descricao || item.efeito || item.desc || ""
       });
       renderizarTraumas();
       calcularEAtualizarCargaESpeed();
