@@ -1060,6 +1060,53 @@ function renderizarUiAgentes() {
         if (pdInput && document.activeElement !== pdInput) {
           pdInput.value = pdCurrent;
         }
+        // Atualiza Defesa, RD e DB em tempo real!
+        const defesaEl = masterCard.querySelector(".mc-val-defesa");
+        if (defesaEl) {
+          defesaEl.textContent = comb.defesa !== undefined && comb.defesa !== "" ? comb.defesa : 0;
+        }
+        const rdEl = masterCard.querySelector(".mc-val-rd");
+        if (rdEl) {
+          rdEl.textContent = comb.rd !== undefined && comb.rd !== "" ? comb.rd : 0;
+        }
+        const dbEl = masterCard.querySelector(".mc-val-db");
+        if (dbEl) {
+          dbEl.textContent = comb.db !== undefined && comb.db !== "" ? comb.db : 0;
+        }
+
+        // Atualiza Atributos em tempo real!
+        const attrAgi = masterCard.querySelector(".mc-attr-agi");
+        if (attrAgi) attrAgi.textContent = attr.agilidade || 0;
+        const attrFor = masterCard.querySelector(".mc-attr-for");
+        if (attrFor) attrFor.textContent = attr.forca || 0;
+        const attrInt = masterCard.querySelector(".mc-attr-int");
+        if (attrInt) attrInt.textContent = attr.inteligencia || 0;
+        const attrVig = masterCard.querySelector(".mc-attr-vig");
+        if (attrVig) attrVig.textContent = attr.vigor || 0;
+        const attrCor = masterCard.querySelector(".mc-attr-cor");
+        if (attrCor) attrCor.textContent = attr.corpo || 0;
+        const attrCar = masterCard.querySelector(".mc-attr-car");
+        if (attrCar) attrCar.textContent = attr.carisma || 0;
+        const attrSab = masterCard.querySelector(".mc-attr-sab");
+        if (attrSab) attrSab.textContent = attr.sabedoria || 0;
+
+        // Atualiza Dados de Cabeçalho em tempo real!
+        const nameEl = masterCard.querySelector(".mc-name");
+        if (nameEl) nameEl.textContent = ident.nome || "Desconhecido";
+        const roleEl = masterCard.querySelector(".mc-role");
+        if (roleEl) roleEl.textContent = ident.ocupacao || "Sem Ocupação";
+        const levelEl = masterCard.querySelector(".mc-level");
+        if (levelEl) levelEl.textContent = `NÍVEL: ${ident.total_niveis || "0"}`;
+        const mcFoto = masterCard.querySelector(".mc-foto");
+        if (mcFoto) {
+          const expectedFotoHtml =
+            agente.perfil && agente.perfil.foto_img
+              ? `<img src="${agente.perfil.foto_img}" alt="Foto de ${ident.nome || "Agente"}">`
+              : `<div style="color: #666; font-size: 11px; text-transform: uppercase; text-align: center; padding: 10px;">Sem Foto</div>`;
+          if (mcFoto.innerHTML !== expectedFotoHtml) {
+            mcFoto.innerHTML = expectedFotoHtml;
+          }
+        }
       } else {
         // Cria novo card caso ainda não exista
         const fotoHtml =
@@ -1081,13 +1128,13 @@ function renderizarUiAgentes() {
               </div>
             </div>
             <div class="mc-attributes">
-              <div><span>AGI</span><strong>${attr.agilidade || 0}</strong></div>
-              <div><span>FOR</span><strong>${attr.forca || 0}</strong></div>
-              <div><span>INT</span><strong>${attr.inteligencia || 0}</strong></div>
-              <div><span>VIG</span><strong>${attr.vigor || 0}</strong></div>
-              <div><span>COR</span><strong>${attr.corpo || 0}</strong></div>
-              <div><span>CAR</span><strong>${attr.carisma || 0}</strong></div>
-              <div><span>SAB</span><strong>${attr.sabedoria || 0}</strong></div>
+              <div><span>AGI</span><strong class="mc-attr-agi">${attr.agilidade || 0}</strong></div>
+              <div><span>FOR</span><strong class="mc-attr-for">${attr.forca || 0}</strong></div>
+              <div><span>INT</span><strong class="mc-attr-int">${attr.inteligencia || 0}</strong></div>
+              <div><span>VIG</span><strong class="mc-attr-vig">${attr.vigor || 0}</strong></div>
+              <div><span>COR</span><strong class="mc-attr-cor">${attr.corpo || 0}</strong></div>
+              <div><span>CAR</span><strong class="mc-attr-car">${attr.carisma || 0}</strong></div>
+              <div><span>SAB</span><strong class="mc-attr-sab">${attr.sabedoria || 0}</strong></div>
             </div>
             <div class="mc-status-bars">
               <div class="mc-bar-container">
@@ -1120,9 +1167,9 @@ function renderizarUiAgentes() {
               </div>
             </div>
             <div class="mc-combat">
-              <div><span>DEFESA</span><strong>${comb.defesa || 0}</strong></div>
-              <div><span>RD</span><strong>${comb.rd || 0}</strong></div>
-              <div><span>DB</span><strong>${comb.db || 0}</strong></div>
+              <div><span>DEFESA</span><strong class="mc-val-defesa" title="Clique para editar Defesa" style="cursor: pointer;" onclick="window.editarCombateAgenteMestre('${agenteDocId}', 'defesa')">${comb.defesa !== undefined && comb.defesa !== "" ? comb.defesa : 0}</strong></div>
+              <div><span>RD</span><strong class="mc-val-rd" title="Clique para editar RD" style="cursor: pointer;" onclick="window.editarCombateAgenteMestre('${agenteDocId}', 'rd')">${comb.rd !== undefined && comb.rd !== "" ? comb.rd : 0}</strong></div>
+              <div><span>DB</span><strong class="mc-val-db" title="Clique para editar DB" style="cursor: pointer;" onclick="window.editarCombateAgenteMestre('${agenteDocId}', 'db')">${comb.db !== undefined && comb.db !== "" ? comb.db : 0}</strong></div>
             </div>
             <div class="mc-footer">
               <button class="mc-btn-ficha" onclick="abrirFicha('${agenteDocId}', true)">Abrir Ficha do Agente</button>
@@ -1179,6 +1226,29 @@ window.definirStatusAgenteMestre = async (agenteDocId, statKey, valorStr) => {
   } catch (error) {
     console.error(`Erro ao definir ${statKey} do agente:`, error);
     alert(`Erro ao definir ${statKey.toUpperCase()}. Verifique as permissões.`);
+  }
+};
+
+window.editarCombateAgenteMestre = async (agenteDocId, statKey) => {
+  const agente = cacheAgentesCampanha.get(agenteDocId);
+  if (!agente) return;
+  const label = statKey.toUpperCase();
+  const valorAtual = agente.combate && agente.combate[statKey] !== undefined ? agente.combate[statKey] : "";
+  const novoValor = prompt(`Alterar ${label} de ${agente.identidade?.nome || "Agente"}:`, valorAtual);
+  if (novoValor === null) return; // Mestre cancelou o prompt
+
+  if (!agente.combate) agente.combate = {};
+  agente.combate[statKey] = novoValor;
+  renderizarUiAgentes();
+
+  try {
+    const agenteRef = doc(db, "agentes", String(agenteDocId));
+    await updateDoc(agenteRef, {
+      [`combate.${statKey}`]: novoValor,
+    });
+  } catch (error) {
+    console.error(`Erro ao atualizar combate.${statKey}:`, error);
+    alert(`Erro ao atualizar ${label}. Verifique as permissões.`);
   }
 };
 
@@ -2567,9 +2637,10 @@ if (formFicha) {
       aplicarTema(novoTema);
     });
   }
-  function atualizarCampoDebounced(categoria, chave, valor) {
+  function atualizarCampoDebounced(categoria, chave, valor, imediato = false) {
     pendingUpdates[`${categoria}.${chave}`] = valor;
     clearTimeout(saveTimeoutFicha);
+    const delay = imediato ? 100 : 500;
     saveTimeoutFicha = setTimeout(async () => {
       const updates = { ...pendingUpdates };
       pendingUpdates = {}; // limpa para o próximo lote
@@ -2581,7 +2652,7 @@ if (formFicha) {
           "Falha ao salvar: Você não tem permissão para editar esta ficha ou o campo.",
         );
       }
-    }, 1000);
+    }, delay);
   }
 
   function atualizarIndicadoresPericiaDiv5() {
@@ -2755,6 +2826,33 @@ if (formFicha) {
 
       // Envia APENAS o campo específico para a nuvem para não apagar edições de outros (ex: Mestre)
       atualizarCampoDebounced(categoria, chave, valorTratado);
+    }
+  });
+
+  formFicha.addEventListener("change", (evento) => {
+    if (isReadOnly) return;
+    if (!agenteAtual) return;
+    const elemento = evento.target;
+    if (elemento.type === "file") return;
+
+    const partes = elemento.id.split("-");
+    if (partes.length === 2) {
+      const categoria = partes[0];
+      const chave = partes[1];
+      if (chave.includes("_base")) return;
+
+      const valorTratado =
+        elemento.type === "number"
+          ? Number(elemento.value)
+          : elemento.type === "checkbox"
+            ? elemento.checked
+            : elemento.value;
+
+      if (!agenteAtual[categoria]) agenteAtual[categoria] = {};
+      agenteAtual[categoria][chave] = valorTratado;
+
+      // Salva imediatamente com delay reduzido ao sair do campo
+      atualizarCampoDebounced(categoria, chave, valorTratado, true);
     }
   });
 
