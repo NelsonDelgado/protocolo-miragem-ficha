@@ -294,7 +294,7 @@ select:focus {
   position: relative;
   width: min(860px, 95vw);
   aspect-ratio: 1;
-  background-image: url("heptagrama_de_atributos.png");
+  background-image: url("HEPTAGRAMA_DE_ATRIBUTOS.png");
   background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
