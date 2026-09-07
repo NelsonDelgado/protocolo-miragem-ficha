@@ -712,13 +712,17 @@ body {
   background: #2d6b22;
   color: #061b04;
 }
-.success-bom {
+.success-bom,
+.success-table td.success-bom {
   background: #88ce6c;
-  color: #111;
+  color: #000000 !important;
+  font-weight: 900 !important;
 }
-.success-normal {
+.success-normal,
+.success-table td.success-normal {
   background: #dcefd1;
-  color: #111;
+  color: #000000 !important;
+  font-weight: 900 !important;
 }
 .success-falha {
   background: #f91515;
