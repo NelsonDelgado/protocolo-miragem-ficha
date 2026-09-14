@@ -25,7 +25,7 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-import { REGRAS } from "./regras.js?v=27";
+import { REGRAS } from "./regras.js?v=28";
 
 const firebaseConfig = {
   // Dados de autenticacao firebase
@@ -2268,7 +2268,7 @@ if (formFicha) {
         <div class="item-editor-row">
           <div class="item-editor-group">
             <label for="editor-hab-vertente">Vertente:</label>
-            <input type="text" id="editor-hab-vertente" list="lista-vertentes-poder" value="${escapeHtml(item.vertente || "Tempo")}" placeholder="Ex: Tempo, Mente, Sombra..." />
+            <input type="text" id="editor-hab-vertente" list="lista-vertentes-poder" value="${escapeHtml(item.vertente || "Uncanny")}" placeholder="Ex: Uncanny, Paranoia, Opressão..." />
             <datalist id="lista-vertentes-poder">
               <option value="Uncanny"></option>
               <option value="Paranoia"></option>
@@ -2278,25 +2278,16 @@ if (formFicha) {
               <option value="Erradicação"></option>
               <option value="Opressão"></option>
               <option value="Áurea"></option>
-              <option value="Alteração"></option>
-              <option value="Cinética"></option>
-              <option value="Dimensão"></option>
-              <option value="Espaço"></option>
-              <option value="Matéria"></option>
-              <option value="Mente"></option>
-              <option value="Sentidos"></option>
-              <option value="Sombra"></option>
-              <option value="Tempo"></option>
             </datalist>
           </div>
           <div class="item-editor-group">
             <label for="editor-hab-custo-poder">Custo:</label>
-            <input type="text" id="editor-hab-custo-poder" value="${escapeHtml(item.custo || "-")}" placeholder="Ex: 1 PM, 2 PE, -" />
+            <input type="text" id="editor-hab-custo-poder" value="${escapeHtml(item.custo || "-")}" placeholder="Ex: 1 PD, 2 PV, -" />
           </div>
         </div>
         <div class="item-editor-group">
           <label for="editor-hab-afinidade">Afinidade:</label>
-          <input type="text" id="editor-hab-afinidade" value="${escapeHtml(item.afinidade || "")}" placeholder="Ex: Mente 3, -" />
+          <input type="text" id="editor-hab-afinidade" value="${escapeHtml(item.afinidade || "")}" placeholder="Ex: Descrição da versão de afinidade..." />
         </div>
       </div>
 
@@ -2360,22 +2351,37 @@ if (formFicha) {
             <option value="Básico"></option>
             <option value="Soberano"></option>
             <option value="Absoluto"></option>
-            <option value="1º Círculo"></option>
-            <option value="2º Círculo"></option>
-            <option value="3º Círculo"></option>
-            <option value="4º Círculo"></option>
-            <option value="5º Círculo"></option>
           </datalist>
         </div>
         <div class="item-editor-group">
           <label for="editor-rit-aspecto">Aspecto:</label>
-          <input type="text" id="editor-rit-aspecto" value="${escapeHtml(item.aspecto || "")}" placeholder="Ex: Tempo, Mente, Sangue..." />
+          <input type="text" id="editor-rit-aspecto" list="lista-aspectos-rit" value="${escapeHtml(item.aspecto || "")}" placeholder="Ex: Uncanny, Paranoia, Opressão..." />
+          <datalist id="lista-aspectos-rit">
+            <option value="UNCANNY"></option>
+            <option value="PARANOIA"></option>
+            <option value="ANGÚSTIA"></option>
+            <option value="SELVAGEM"></option>
+            <option value="NESTING"></option>
+            <option value="ERRADICAÇÃO"></option>
+            <option value="OPRESSÃO"></option>
+            <option value="ÁUREA"></option>
+            <option value="OPRESSÃO / ERRADICAÇÃO"></option>
+            <option value="NESTING / OPRESSÃO"></option>
+            <option value="NESTING / UNCANNY"></option>
+            <option value="ERRADICAÇÃO / PARANOIA"></option>
+            <option value="UNCANNY / SELVAGEM"></option>
+            <option value="SELVAGEM / ANGÚSTIA"></option>
+            <option value="SELVAGEM / PARANOIA"></option>
+            <option value="NESTING / ANGÚSTIA"></option>
+            <option value="NESTING / ERRADICAÇÃO"></option>
+            <option value="ANGÚSTIA / NESTING"></option>
+          </datalist>
         </div>
       </div>
       <div class="item-editor-row">
         <div class="item-editor-group">
           <label for="editor-rit-custo">Custo:</label>
-          <input type="text" id="editor-rit-custo" value="${escapeHtml(item.custo || "")}" placeholder="Ex: 1 PE, 2 PE + 1 PM..." />
+          <input type="text" id="editor-rit-custo" value="${escapeHtml(item.custo || "")}" placeholder="Ex: 1 PD, 2 PV..." />
         </div>
         <div class="item-editor-group">
           <label for="editor-rit-resistencia">Resistência:</label>
@@ -2489,7 +2495,7 @@ if (formFicha) {
               agenteAtual.habilidades.lista[index] = habObj;
             }
           } else {
-            const vertente = document.getElementById("editor-hab-vertente").value.trim() || "Tempo";
+            const vertente = document.getElementById("editor-hab-vertente").value.trim() || "Uncanny";
             const custo = document.getElementById("editor-hab-custo-poder").value.trim() || "-";
             const afinidade = document.getElementById("editor-hab-afinidade").value.trim() || "";
 
