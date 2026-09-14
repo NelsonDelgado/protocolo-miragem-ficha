@@ -25,7 +25,7 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-import { REGRAS } from "./regras.js?v=28";
+import { REGRAS } from "./regras.js?v=29";
 
 const firebaseConfig = {
   // Dados de autenticacao firebase
@@ -392,6 +392,8 @@ function normalizarAgente(agente) {
           alc: "-",
           target: "-",
           duracao: "-",
+          resistencia: "-",
+          condicao: "-",
           desc: desc,
         };
       });
@@ -411,8 +413,13 @@ function normalizarAgente(agente) {
           alc: "-",
           target: "-",
           duracao: "-",
+          resistencia: "-",
+          condicao: "-",
           desc: partes[1] ? partes[1].trim() : r,
         };
+      }
+      if (typeof r === "object" && r !== null) {
+        if (r.condicao === undefined) r.condicao = "-";
       }
       return r;
     });
@@ -1549,6 +1556,8 @@ if (formFicha) {
       if (rit.alc && rit.alc !== "-") detailsStr += ` | Alcance: ${rit.alc}`;
       if (rit.target && rit.target !== "-") detailsStr += ` | Alvo: ${rit.target}`;
       if (rit.duracao && rit.duracao !== "-") detailsStr += ` | Duração: ${rit.duracao}`;
+      if (rit.resistencia && rit.resistencia !== "-") detailsStr += ` | Resistência: ${rit.resistencia}`;
+      if (rit.condicao && rit.condicao !== "-") detailsStr += ` | Condição: ${rit.condicao}`;
 
       card.innerHTML = `
         <div class="item-card-header">
@@ -1863,6 +1872,7 @@ if (formFicha) {
         if (item.afinidade) detailsStr += ` | Afinidade: ${item.afinidade}`;
       } else if (currentModalType === "ritual") {
         detailsStr = `Circulo: ${item.circulo} | Aspecto: ${item.aspecto} | Custo: ${item.custo}`;
+        if (item.condicao && item.condicao !== "-") detailsStr += ` | Condição: ${item.condicao}`;
       } else if (currentModalType === "equipamento") {
         detailsStr = `${item.category} | Peso: ${item.peso} kg | Categoria: ${item.cat}`;
         if (item.dano) detailsStr += ` | Dano: ${item.dano}`;
@@ -2005,6 +2015,7 @@ if (formFicha) {
         target: item.target,
         duracao: item.duracao,
         resistencia: item.resistencia,
+        condicao: item.condicao || "-",
         desc: item.desc
       });
       renderizarRituais();
@@ -2325,7 +2336,7 @@ if (formFicha) {
     const isNew = index === -1;
     const item = !isNew && agenteAtual.habilidades?.rituais?.[index]
       ? agenteAtual.habilidades.rituais[index]
-      : { nome: "", circulo: "Básico", aspecto: "", custo: "", alc: "", target: "", duracao: "", resistencia: "-", desc: "" };
+      : { nome: "", circulo: "Básico", aspecto: "", custo: "", alc: "", target: "", duracao: "", resistencia: "-", condicao: "-", desc: "" };
 
     editingItemState = { category: "ritual", index, isNew };
 
@@ -2398,9 +2409,15 @@ if (formFicha) {
           <input type="text" id="editor-rit-target" value="${escapeHtml(item.target || "")}" placeholder="Ex: 1 pessoa, Você..." />
         </div>
       </div>
-      <div class="item-editor-group">
-        <label for="editor-rit-duracao">Duração:</label>
-        <input type="text" id="editor-rit-duracao" value="${escapeHtml(item.duracao || "")}" placeholder="Ex: Instantâneo, Cena..." />
+      <div class="item-editor-row">
+        <div class="item-editor-group">
+          <label for="editor-rit-duracao">Duração:</label>
+          <input type="text" id="editor-rit-duracao" value="${escapeHtml(item.duracao || "")}" placeholder="Ex: Instantâneo, Cena..." />
+        </div>
+        <div class="item-editor-group">
+          <label for="editor-rit-condicao">Condição:</label>
+          <input type="text" id="editor-rit-condicao" value="${escapeHtml(item.condicao && item.condicao !== "-" ? item.condicao : "")}" placeholder="Ex: Machucado, Cego, -" />
+        </div>
       </div>
       <div class="item-editor-group">
         <label for="editor-rit-desc">Descrição / Efeito:</label>
@@ -2539,6 +2556,7 @@ if (formFicha) {
           const target = document.getElementById("editor-rit-target").value.trim() || "-";
           const duracao = document.getElementById("editor-rit-duracao").value.trim() || "-";
           const resistencia = document.getElementById("editor-rit-resistencia").value.trim() || "-";
+          const condicao = document.getElementById("editor-rit-condicao")?.value.trim() || "-";
           const desc = document.getElementById("editor-rit-desc").value.trim();
           if (!nome) return alert("Por favor, preencha o nome do ritual.");
 
@@ -2554,6 +2572,7 @@ if (formFicha) {
             target,
             duracao,
             resistencia,
+            condicao,
             desc
           };
 
