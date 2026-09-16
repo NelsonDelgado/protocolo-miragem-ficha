@@ -25,7 +25,7 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-import { REGRAS } from "./regras.js?v=27";
+import { REGRAS } from "./regras.js?v=29";
 
 const firebaseConfig = {
   // Dados de autenticacao firebase
@@ -392,6 +392,8 @@ function normalizarAgente(agente) {
           alc: "-",
           target: "-",
           duracao: "-",
+          resistencia: "-",
+          condicao: "-",
           desc: desc,
         };
       });
@@ -411,8 +413,13 @@ function normalizarAgente(agente) {
           alc: "-",
           target: "-",
           duracao: "-",
+          resistencia: "-",
+          condicao: "-",
           desc: partes[1] ? partes[1].trim() : r,
         };
+      }
+      if (typeof r === "object" && r !== null) {
+        if (r.condicao === undefined) r.condicao = "-";
       }
       return r;
     });
@@ -1549,6 +1556,8 @@ if (formFicha) {
       if (rit.alc && rit.alc !== "-") detailsStr += ` | Alcance: ${rit.alc}`;
       if (rit.target && rit.target !== "-") detailsStr += ` | Alvo: ${rit.target}`;
       if (rit.duracao && rit.duracao !== "-") detailsStr += ` | Duração: ${rit.duracao}`;
+      if (rit.resistencia && rit.resistencia !== "-") detailsStr += ` | Resistência: ${rit.resistencia}`;
+      if (rit.condicao && rit.condicao !== "-") detailsStr += ` | Condição: ${rit.condicao}`;
 
       card.innerHTML = `
         <div class="item-card-header">
@@ -1863,6 +1872,7 @@ if (formFicha) {
         if (item.afinidade) detailsStr += ` | Afinidade: ${item.afinidade}`;
       } else if (currentModalType === "ritual") {
         detailsStr = `Circulo: ${item.circulo} | Aspecto: ${item.aspecto} | Custo: ${item.custo}`;
+        if (item.condicao && item.condicao !== "-") detailsStr += ` | Condição: ${item.condicao}`;
       } else if (currentModalType === "equipamento") {
         detailsStr = `${item.category} | Peso: ${item.peso} kg | Categoria: ${item.cat}`;
         if (item.dano) detailsStr += ` | Dano: ${item.dano}`;
@@ -2005,6 +2015,7 @@ if (formFicha) {
         target: item.target,
         duracao: item.duracao,
         resistencia: item.resistencia,
+        condicao: item.condicao || "-",
         desc: item.desc
       });
       renderizarRituais();
@@ -2268,7 +2279,7 @@ if (formFicha) {
         <div class="item-editor-row">
           <div class="item-editor-group">
             <label for="editor-hab-vertente">Vertente:</label>
-            <input type="text" id="editor-hab-vertente" list="lista-vertentes-poder" value="${escapeHtml(item.vertente || "Tempo")}" placeholder="Ex: Tempo, Mente, Sombra..." />
+            <input type="text" id="editor-hab-vertente" list="lista-vertentes-poder" value="${escapeHtml(item.vertente || "Uncanny")}" placeholder="Ex: Uncanny, Paranoia, Opressão..." />
             <datalist id="lista-vertentes-poder">
               <option value="Uncanny"></option>
               <option value="Paranoia"></option>
@@ -2278,25 +2289,16 @@ if (formFicha) {
               <option value="Erradicação"></option>
               <option value="Opressão"></option>
               <option value="Áurea"></option>
-              <option value="Alteração"></option>
-              <option value="Cinética"></option>
-              <option value="Dimensão"></option>
-              <option value="Espaço"></option>
-              <option value="Matéria"></option>
-              <option value="Mente"></option>
-              <option value="Sentidos"></option>
-              <option value="Sombra"></option>
-              <option value="Tempo"></option>
             </datalist>
           </div>
           <div class="item-editor-group">
             <label for="editor-hab-custo-poder">Custo:</label>
-            <input type="text" id="editor-hab-custo-poder" value="${escapeHtml(item.custo || "-")}" placeholder="Ex: 1 PM, 2 PE, -" />
+            <input type="text" id="editor-hab-custo-poder" value="${escapeHtml(item.custo || "-")}" placeholder="Ex: 1 PD, 2 PV, -" />
           </div>
         </div>
         <div class="item-editor-group">
           <label for="editor-hab-afinidade">Afinidade:</label>
-          <input type="text" id="editor-hab-afinidade" value="${escapeHtml(item.afinidade || "")}" placeholder="Ex: Mente 3, -" />
+          <input type="text" id="editor-hab-afinidade" value="${escapeHtml(item.afinidade || "")}" placeholder="Ex: Descrição da versão de afinidade..." />
         </div>
       </div>
 
@@ -2334,7 +2336,7 @@ if (formFicha) {
     const isNew = index === -1;
     const item = !isNew && agenteAtual.habilidades?.rituais?.[index]
       ? agenteAtual.habilidades.rituais[index]
-      : { nome: "", circulo: "Básico", aspecto: "", custo: "", alc: "", target: "", duracao: "", resistencia: "-", desc: "" };
+      : { nome: "", circulo: "Básico", aspecto: "", custo: "", alc: "", target: "", duracao: "", resistencia: "-", condicao: "-", desc: "" };
 
     editingItemState = { category: "ritual", index, isNew };
 
@@ -2360,22 +2362,37 @@ if (formFicha) {
             <option value="Básico"></option>
             <option value="Soberano"></option>
             <option value="Absoluto"></option>
-            <option value="1º Círculo"></option>
-            <option value="2º Círculo"></option>
-            <option value="3º Círculo"></option>
-            <option value="4º Círculo"></option>
-            <option value="5º Círculo"></option>
           </datalist>
         </div>
         <div class="item-editor-group">
           <label for="editor-rit-aspecto">Aspecto:</label>
-          <input type="text" id="editor-rit-aspecto" value="${escapeHtml(item.aspecto || "")}" placeholder="Ex: Tempo, Mente, Sangue..." />
+          <input type="text" id="editor-rit-aspecto" list="lista-aspectos-rit" value="${escapeHtml(item.aspecto || "")}" placeholder="Ex: Uncanny, Paranoia, Opressão..." />
+          <datalist id="lista-aspectos-rit">
+            <option value="UNCANNY"></option>
+            <option value="PARANOIA"></option>
+            <option value="ANGÚSTIA"></option>
+            <option value="SELVAGEM"></option>
+            <option value="NESTING"></option>
+            <option value="ERRADICAÇÃO"></option>
+            <option value="OPRESSÃO"></option>
+            <option value="ÁUREA"></option>
+            <option value="OPRESSÃO / ERRADICAÇÃO"></option>
+            <option value="NESTING / OPRESSÃO"></option>
+            <option value="NESTING / UNCANNY"></option>
+            <option value="ERRADICAÇÃO / PARANOIA"></option>
+            <option value="UNCANNY / SELVAGEM"></option>
+            <option value="SELVAGEM / ANGÚSTIA"></option>
+            <option value="SELVAGEM / PARANOIA"></option>
+            <option value="NESTING / ANGÚSTIA"></option>
+            <option value="NESTING / ERRADICAÇÃO"></option>
+            <option value="ANGÚSTIA / NESTING"></option>
+          </datalist>
         </div>
       </div>
       <div class="item-editor-row">
         <div class="item-editor-group">
           <label for="editor-rit-custo">Custo:</label>
-          <input type="text" id="editor-rit-custo" value="${escapeHtml(item.custo || "")}" placeholder="Ex: 1 PE, 2 PE + 1 PM..." />
+          <input type="text" id="editor-rit-custo" value="${escapeHtml(item.custo || "")}" placeholder="Ex: 1 PD, 2 PV..." />
         </div>
         <div class="item-editor-group">
           <label for="editor-rit-resistencia">Resistência:</label>
@@ -2392,9 +2409,15 @@ if (formFicha) {
           <input type="text" id="editor-rit-target" value="${escapeHtml(item.target || "")}" placeholder="Ex: 1 pessoa, Você..." />
         </div>
       </div>
-      <div class="item-editor-group">
-        <label for="editor-rit-duracao">Duração:</label>
-        <input type="text" id="editor-rit-duracao" value="${escapeHtml(item.duracao || "")}" placeholder="Ex: Instantâneo, Cena..." />
+      <div class="item-editor-row">
+        <div class="item-editor-group">
+          <label for="editor-rit-duracao">Duração:</label>
+          <input type="text" id="editor-rit-duracao" value="${escapeHtml(item.duracao || "")}" placeholder="Ex: Instantâneo, Cena..." />
+        </div>
+        <div class="item-editor-group">
+          <label for="editor-rit-condicao">Condição:</label>
+          <input type="text" id="editor-rit-condicao" value="${escapeHtml(item.condicao && item.condicao !== "-" ? item.condicao : "")}" placeholder="Ex: Machucado, Cego, -" />
+        </div>
       </div>
       <div class="item-editor-group">
         <label for="editor-rit-desc">Descrição / Efeito:</label>
@@ -2489,7 +2512,7 @@ if (formFicha) {
               agenteAtual.habilidades.lista[index] = habObj;
             }
           } else {
-            const vertente = document.getElementById("editor-hab-vertente").value.trim() || "Tempo";
+            const vertente = document.getElementById("editor-hab-vertente").value.trim() || "Uncanny";
             const custo = document.getElementById("editor-hab-custo-poder").value.trim() || "-";
             const afinidade = document.getElementById("editor-hab-afinidade").value.trim() || "";
 
@@ -2533,6 +2556,7 @@ if (formFicha) {
           const target = document.getElementById("editor-rit-target").value.trim() || "-";
           const duracao = document.getElementById("editor-rit-duracao").value.trim() || "-";
           const resistencia = document.getElementById("editor-rit-resistencia").value.trim() || "-";
+          const condicao = document.getElementById("editor-rit-condicao")?.value.trim() || "-";
           const desc = document.getElementById("editor-rit-desc").value.trim();
           if (!nome) return alert("Por favor, preencha o nome do ritual.");
 
@@ -2548,6 +2572,7 @@ if (formFicha) {
             target,
             duracao,
             resistencia,
+            condicao,
             desc
           };
 
