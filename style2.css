@@ -69,12 +69,22 @@ body {
   align-items: center;
   width: 80%;
   max-width: 400px;
+  max-height: 92vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  padding: 10px 6px;
+  -webkit-overflow-scrolling: touch;
   z-index: 10;
 }
 
 #agents-view.b1 {
   max-width: 900px;
   width: 95%;
+  max-height: 92vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 15px 10px;
 }
 
 /* Painel de registo com estética sombria */
@@ -121,6 +131,15 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  box-sizing: border-box;
+}
+
+#campaign-list {
+  max-height: 230px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Estilização dos Botões dos Agentes no Centro do Heptagrama */
@@ -133,6 +152,41 @@ body {
   padding: 10px;
   border-radius: 5px;
   border: 1px solid #444;
+  box-sizing: border-box;
+}
+
+/* Scrollbars elegantes para o dashboard */
+.b1,
+#campaign-list,
+.lista-personagens-container {
+  scrollbar-width: thin;
+  scrollbar-color: #555 rgba(0, 0, 0, 0.4);
+}
+
+.b1::-webkit-scrollbar,
+#campaign-list::-webkit-scrollbar,
+.lista-personagens-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.b1::-webkit-scrollbar-track,
+#campaign-list::-webkit-scrollbar-track,
+.lista-personagens-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 4px;
+}
+
+.b1::-webkit-scrollbar-thumb,
+#campaign-list::-webkit-scrollbar-thumb,
+.lista-personagens-container::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 4px;
+}
+
+.b1::-webkit-scrollbar-thumb:hover,
+#campaign-list::-webkit-scrollbar-thumb:hover,
+.lista-personagens-container::-webkit-scrollbar-thumb:hover {
+  background: #888;
 }
 .agent-center-btn {
   background: rgba(30, 30, 30, 0.9);
