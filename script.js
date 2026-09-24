@@ -1511,7 +1511,7 @@ if (formFicha) {
       const isPoder = item.tipo === "poder";
       const afinidadeAtiva = isPoder && !!item.afinidadeAtiva;
       let typeStr = isPoder
-        ? `Poder de Incógnita - ${item.vertente}${afinidadeAtiva ? " | Afinidade Ativa" : ""}`
+        ? `Poder de Incógnita - ${item.vertente}`
         : item.categoria === "Banda"
           ? `Habilidade de Banda (Equipe)`
           : `Habilidade - ${item.categoria}`;
@@ -1523,11 +1523,11 @@ if (formFicha) {
         const textoAfinidade = item.afinidade ? item.afinidade : "Versão com afinidade";
         extraInfoHtml = `
           <div class="item-card-afinidade ${isChecked ? 'afinidade-ativa' : ''}">
-            <label style="display: flex; align-items: flex-start; gap: 7px; cursor: ${isReadOnly ? 'default' : 'pointer'}; margin: 0; font-size: 11px;">
-              <input type="checkbox" ${isChecked ? "checked" : ""} ${isReadOnly ? "disabled" : ""} onchange="window.alternarAfinidadePoder(${index}, this.checked)" style="cursor: ${isReadOnly ? 'default' : 'pointer'}; margin-top: 2px;" title="Marcar/Desmarcar Afinidade" />
-              <div style="flex: 1;">
-                <strong>Afinidade${isChecked ? ' (Ativa)' : ''}:</strong> ${escapeHtml(textoAfinidade)}
-              </div>
+            <label class="afinidade-toggle-label" style="cursor: ${isReadOnly ? 'default' : 'pointer'};">
+              <input type="checkbox" class="afinidade-checkbox" ${isChecked ? "checked" : ""} ${isReadOnly ? "disabled" : ""} onchange="window.alternarAfinidadePoder(${index}, this.checked)" title="Marcar/Desmarcar Afinidade" />
+              <span class="afinidade-text">
+                <strong>Afinidade:</strong> ${escapeHtml(textoAfinidade)}
+              </span>
             </label>
           </div>
         `;
@@ -2328,8 +2328,8 @@ if (formFicha) {
           <input type="text" id="editor-hab-afinidade" value="${escapeHtml(item.afinidade || "")}" placeholder="Ex: Descrição da versão de afinidade..." />
         </div>
         <div class="item-editor-group" style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
-          <input type="checkbox" id="editor-hab-afinidade-ativa" ${item.afinidadeAtiva ? "checked" : ""} style="width: auto; margin: 0; cursor: pointer;" />
-          <label for="editor-hab-afinidade-ativa" style="margin: 0; cursor: pointer; font-weight: bold; font-size: 13px;">Possui Afinidade com este Poder</label>
+          <input type="checkbox" id="editor-hab-afinidade-ativa" ${item.afinidadeAtiva ? "checked" : ""} style="width: 14px; height: 14px; min-height: 14px; margin: 0; cursor: pointer; accent-color: #8e24aa;" />
+          <label for="editor-hab-afinidade-ativa" style="margin: 0; cursor: pointer; font-size: 13px;">Possui Afinidade com este Poder</label>
         </div>
       </div>
 
