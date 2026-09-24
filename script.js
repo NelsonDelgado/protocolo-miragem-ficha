@@ -25,7 +25,7 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-import { REGRAS } from "./regras.js?v=29";
+import { REGRAS } from "./regras.js?v=30";
 
 const firebaseConfig = {
   // Dados de autenticacao firebase
@@ -367,6 +367,11 @@ function normalizarAgente(agente) {
           requisito: "-",
           descricao: partes[1] ? partes[1].trim() : h,
         };
+      }
+      if (typeof h === "object" && h !== null) {
+        if (h.tipo === "poder") {
+          h.afinidadeAtiva = !!h.afinidadeAtiva;
+        }
       }
       return h;
     });
@@ -1504,6 +1509,7 @@ if (formFicha) {
       card.className = "interactive-item-card";
 
       const isPoder = item.tipo === "poder";
+      const afinidadeAtiva = isPoder && !!item.afinidadeAtiva;
       let typeStr = isPoder
         ? `Poder de Incógnita - ${item.vertente}`
         : item.categoria === "Banda"
@@ -1512,15 +1518,26 @@ if (formFicha) {
       if (item.custo && item.custo !== "-") typeStr += ` | Custo: ${item.custo}`;
 
       let extraInfoHtml = "";
-      if (isPoder && item.afinidade) {
-        extraInfoHtml = `<div class="item-card-afinidade" style="font-size:10px; margin-top:2px;"><strong>Afinidade:</strong> ${item.afinidade}</div>`;
+      if (isPoder) {
+        const isChecked = afinidadeAtiva;
+        const textoAfinidade = item.afinidade ? item.afinidade : "Versão com afinidade";
+        extraInfoHtml = `
+          <div class="item-card-afinidade ${isChecked ? 'afinidade-ativa' : ''}">
+            <label class="afinidade-toggle-label" style="cursor: ${isReadOnly ? 'default' : 'pointer'};">
+              <input type="checkbox" class="afinidade-checkbox" ${isChecked ? "checked" : ""} ${isReadOnly ? "disabled" : ""} onchange="window.alternarAfinidadePoder(${index}, this.checked)" title="Marcar/Desmarcar Afinidade" />
+              <span class="afinidade-text">
+                <strong>Afinidade:</strong> ${escapeHtml(textoAfinidade)}
+              </span>
+            </label>
+          </div>
+        `;
       } else if (!isPoder && item.requisito && item.requisito !== "-") {
-        extraInfoHtml = `<div class="item-card-requisito" style="font-size:10px; margin-top:2px;"><strong>Requisito:</strong> ${item.requisito}</div>`;
+        extraInfoHtml = `<div class="item-card-requisito" style="font-size:10px; margin-top:4px;"><strong>Requisito:</strong> ${escapeHtml(item.requisito)}</div>`;
       }
 
       card.innerHTML = `
         <div class="item-card-header">
-          <span class="item-card-title">${item.nome}</span>
+          <span class="item-card-title">${escapeHtml(item.nome)}${afinidadeAtiva ? ' <span class="afinidade-badge">✦ AFINIDADE</span>' : ''}</span>
           ${isReadOnly ? "" : `
             <div class="item-card-actions">
               <button type="button" class="item-card-edit" onclick="window.editarHabilidadePoder(${index})">Editar</button>
@@ -1529,7 +1546,7 @@ if (formFicha) {
           `}
         </div>
         <div class="item-card-details">${typeStr}</div>
-        <div class="item-card-desc">${item.descricao}</div>
+        <div class="item-card-desc">${escapeHtml(item.descricao)}</div>
         ${extraInfoHtml}
       `;
       container.appendChild(card);
@@ -1989,7 +2006,8 @@ if (formFicha) {
         vertente: item.vertente,
         custo: item.custo,
         descricao: item.descricao,
-        afinidade: item.afinidade || ""
+        afinidade: item.afinidade || "",
+        afinidadeAtiva: false
       });
       renderizarHabilidadesPoderes();
       
@@ -2134,6 +2152,15 @@ if (formFicha) {
     }
   };
 
+  window.alternarAfinidadePoder = (index, ativa) => {
+    if (isReadOnly || !agenteAtual?.habilidades?.lista?.[index]) return;
+    agenteAtual.habilidades.lista[index].afinidadeAtiva = !!ativa;
+    renderizarHabilidadesPoderes();
+    updateDoc(doc(db, "agentes", String(agenteId)), {
+      "habilidades.lista": agenteAtual.habilidades.lista
+    }).catch(err => console.error("Erro ao salvar afinidade do poder:", err));
+  };
+
   window.removerRitual = (index) => {
     if (isReadOnly) return;
     agenteAtual.habilidades.rituais.splice(index, 1);
@@ -2220,7 +2247,7 @@ if (formFicha) {
     const isNew = index === -1;
     const item = !isNew && agenteAtual.habilidades?.lista?.[index]
       ? agenteAtual.habilidades.lista[index]
-      : { tipo: defaultTipo || "habilidade", nome: "", categoria: "Combate", vertente: "Tempo", custo: "-", requisito: "-", afinidade: "", descricao: "" };
+      : { tipo: defaultTipo || "habilidade", nome: "", categoria: "Combate", vertente: "Uncanny", custo: "-", requisito: "-", afinidade: "", afinidadeAtiva: false, descricao: "" };
 
     editingItemState = { category: "habilidade_poder", index, isNew };
 
@@ -2299,6 +2326,10 @@ if (formFicha) {
         <div class="item-editor-group">
           <label for="editor-hab-afinidade">Afinidade:</label>
           <input type="text" id="editor-hab-afinidade" value="${escapeHtml(item.afinidade || "")}" placeholder="Ex: Descrição da versão de afinidade..." />
+        </div>
+        <div class="item-editor-group" style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+          <input type="checkbox" id="editor-hab-afinidade-ativa" ${item.afinidadeAtiva ? "checked" : ""} style="width: 14px; height: 14px; min-height: 14px; margin: 0; cursor: pointer; accent-color: #8e24aa;" />
+          <label for="editor-hab-afinidade-ativa" style="margin: 0; cursor: pointer; font-size: 13px;">Possui Afinidade com este Poder</label>
         </div>
       </div>
 
@@ -2515,6 +2546,7 @@ if (formFicha) {
             const vertente = document.getElementById("editor-hab-vertente").value.trim() || "Uncanny";
             const custo = document.getElementById("editor-hab-custo-poder").value.trim() || "-";
             const afinidade = document.getElementById("editor-hab-afinidade").value.trim() || "";
+            const afinidadeAtiva = document.getElementById("editor-hab-afinidade-ativa")?.checked || false;
 
             const poderObj = {
               id: isNew ? Date.now() : (agenteAtual.habilidades.lista[index]?.id || Date.now()),
@@ -2523,7 +2555,8 @@ if (formFicha) {
               vertente,
               custo,
               descricao,
-              afinidade
+              afinidade,
+              afinidadeAtiva
             };
 
             if (isNew) {
