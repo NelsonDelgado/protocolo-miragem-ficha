@@ -1197,6 +1197,29 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .item-card-afinidade {
   color: #8e24aa;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.03);
+  border-left: 3px solid #ccc;
+  margin-top: 6px;
+  transition: all 0.2s ease;
+}
+
+.item-card-afinidade.afinidade-ativa {
+  background: rgba(142, 36, 170, 0.1);
+  border-left-color: #8e24aa;
+}
+
+.afinidade-badge {
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(142, 36, 170, 0.15);
+  color: #8e24aa;
+  border: 1px solid rgba(142, 36, 170, 0.3);
+  margin-left: 6px;
+  vertical-align: middle;
 }
 
 .item-card-requisito {
@@ -1687,6 +1710,19 @@ body.dark-theme .item-card-desc {
 
 body.dark-theme .item-card-afinidade {
   color: #d8b4fe;
+  background: rgba(255, 255, 255, 0.03);
+  border-left-color: #555;
+}
+
+body.dark-theme .item-card-afinidade.afinidade-ativa {
+  background: rgba(216, 180, 254, 0.12);
+  border-left-color: #d8b4fe;
+}
+
+body.dark-theme .afinidade-badge {
+  background: rgba(216, 180, 254, 0.2);
+  color: #d8b4fe;
+  border-color: rgba(216, 180, 254, 0.4);
 }
 
 body.dark-theme .item-card-requisito {
