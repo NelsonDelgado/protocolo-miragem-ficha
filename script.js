@@ -25,7 +25,7 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-import { REGRAS } from "./regras.js?v=31";
+import { REGRAS } from "./regras.js?v=32";
 
 const firebaseConfig = {
   // Dados de autenticacao firebase
@@ -1321,9 +1321,10 @@ const formFicha = document.getElementById("form-ficha");
 
 if (formFicha) {
   const urlParams = new URLSearchParams(window.location.search);
-  const agenteId = Number(urlParams.get("id")); // Number() lê IDs gigantes de Date.now() com mais precisão do que parseInt
+  const rawId = urlParams.get("id");
+  const agenteId = rawId && rawId !== "0" && rawId !== "null" ? rawId : null;
   const isReadOnly = urlParams.get("readonly") === "true";
-  let agenteAtual = null;
+  let agenteAtual = criarAgenteEmBranco("Agente");
   let pendingUpdates = {};
   let saveTimeoutFicha;
 
@@ -1525,7 +1526,7 @@ if (formFicha) {
           `}
         </div>
         <div class="item-card-details">${detailsStr}</div>
-        ${eq.desc ? `<div class="item-card-desc" style="font-size: 11px; margin-top: 3px;">${escapeHtml(eq.desc)}</div>` : ""}
+        ${!isArma && eq.desc ? `<div class="item-card-desc" style="font-size: 11px; margin-top: 3px;">${escapeHtml(eq.desc)}</div>` : ""}
         ${upgradesHtml}
         ${controlsHtml}
       `;
@@ -2010,6 +2011,7 @@ if (formFicha) {
         detailsStr = `Tipo: <strong>${item.categoria || item.tipo}</strong> | Dano: <strong>${item.dano}</strong>${item.danoTipo ? ` (${item.danoTipo})` : ""} | Alc: <strong>${item.alc}</strong> | Atq: <strong>${item.atq}</strong> | Peso: <strong>${item.peso} kg</strong>`;
         if (item.fa && item.fa !== "-") detailsStr += ` | Fa: <strong>${item.fa}</strong>`;
         if (item.mun && item.mun !== "-") detailsStr += ` | Mun: <strong>${item.mun}</strong>`;
+        descStr = ""; // Armas não possuem descrição nas regras oficiais
       } else if (currentModalType === "equipamento") {
         detailsStr = `${item.category} | Peso: ${item.peso} kg`;
         if (item.cat) detailsStr += ` | Categoria: ${item.cat}`;
@@ -2024,29 +2026,36 @@ if (formFicha) {
 
       row.innerHTML = `
         <div class="modal-list-item-header">
-          <span class="modal-list-item-title">${item.nome}</span>
-          <button type="button" class="modal-list-item-btn" id="modal-add-item-${idx}">+ Adicionar</button>
+          <span class="modal-list-item-title">${escapeHtml(item.nome)}</span>
+          <button type="button" class="modal-list-item-btn">+ Adicionar</button>
         </div>
         ${detailsStr ? `<div class="modal-list-item-details">${detailsStr}</div>` : ""}
-        ${descStr ? `<div class="modal-list-item-desc">${descStr}</div>` : ""}
+        ${descStr ? `<div class="modal-list-item-desc">${escapeHtml(descStr)}</div>` : ""}
       `;
 
-      body.appendChild(row);
+      const btnAdd = row.querySelector(".modal-list-item-btn");
+      if (btnAdd) {
+        btnAdd.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          adicionarItem(item);
+        };
+      }
 
-      document.getElementById(`modal-add-item-${idx}`).onclick = () => {
-        adicionarItem(item);
-      };
+      body.appendChild(row);
     });
   }
 
   function adicionarItem(item) {
-    if (isReadOnly || !agenteAtual) return;
+    if (isReadOnly) return;
+    if (!agenteAtual) agenteAtual = criarAgenteEmBranco("Agente");
 
     if (currentModalType === "fobia" || currentModalType === "mania" || currentModalType === "ferimento" || currentModalType === "maldicao") {
+      if (!agenteAtual.perfil) agenteAtual.perfil = { traumas: [] };
       if (!Array.isArray(agenteAtual.perfil.traumas)) agenteAtual.perfil.traumas = [];
       const itemTipo = item.tipo || item.type || currentModalType;
       agenteAtual.perfil.traumas.push({
-        id: item.id,
+        id: item.id || Date.now(),
         nome: item.nome,
         type: itemTipo,
         tipo: itemTipo,
@@ -2054,10 +2063,13 @@ if (formFicha) {
       });
       renderizarTraumas();
       calcularEAtualizarCargaESpeed();
-      updateDoc(doc(db, "agentes", String(agenteId)), {
-        "perfil.traumas": agenteAtual.perfil.traumas
-      }).catch(e => console.error("Erro ao salvar trauma:", e));
+      if (agenteId) {
+        updateDoc(doc(db, "agentes", String(agenteId)), {
+          "perfil.traumas": agenteAtual.perfil.traumas
+        }).catch(e => console.error("Erro ao salvar trauma:", e));
+      }
     } else if (currentModalType === "equipamento" || currentModalType === "arma") {
+      if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], carga: 0, peso: "0 kg" };
       if (!Array.isArray(agenteAtual.inventario.equipamentos)) agenteAtual.inventario.equipamentos = [];
       const munMaxNum = typeof item.mun === "number" ? item.mun : (parseInt(item.mun) || 0);
       agenteAtual.inventario.equipamentos.push({
@@ -2074,35 +2086,37 @@ if (formFicha) {
         dano: item.dano || "-",
         danoTipo: item.danoTipo || "-",
         alc: item.alc || "-",
-        atq: item.atq || "1",
-        desc: item.desc || item.descricao || ""
+        atq: item.atq || "1"
       });
       renderizarEquipamentos();
       calcularEAtualizarCargaESpeed();
-      salvarEquipamentosNuvem();
+      if (agenteId) salvarEquipamentosNuvem();
     } else if (currentModalType === "moradia") {
+      if (!agenteAtual.recursos) agenteAtual.recursos = { bens_materiais: [] };
       if (!Array.isArray(agenteAtual.recursos.bens_materiais)) agenteAtual.recursos.bens_materiais = [];
       agenteAtual.recursos.bens_materiais.push({
-        id: item.id,
+        id: item.id || Date.now(),
         nome: item.nome,
         tipo: "moradia",
-        preco: item.preco,
+        preco: item.preco || 0,
         upgrades: []
       });
       renderizarBensMateriais();
-      salvarBensMateriaisNuvem();
+      if (agenteId) salvarBensMateriaisNuvem();
     } else if (currentModalType === "veiculo") {
+      if (!agenteAtual.recursos) agenteAtual.recursos = { bens_materiais: [] };
       if (!Array.isArray(agenteAtual.recursos.bens_materiais)) agenteAtual.recursos.bens_materiais = [];
       agenteAtual.recursos.bens_materiais.push({
-        id: item.id,
+        id: item.id || Date.now(),
         nome: item.nome,
         tipo: "veiculo",
-        preco: item.preco,
+        preco: item.preco || 0,
         velocidade: item.velocidade || "N/A"
       });
       renderizarBensMateriais();
-      salvarBensMateriaisNuvem();
+      if (agenteId) salvarBensMateriaisNuvem();
     } else if (currentModalType === "habilidade") {
+      if (!agenteAtual.habilidades) agenteAtual.habilidades = { lista: [], rituais: [] };
       if (!Array.isArray(agenteAtual.habilidades.lista)) agenteAtual.habilidades.lista = [];
       if (item.categoria === "Banda") {
         const totalBanda = agenteAtual.habilidades.lista.filter(x => x.categoria === "Banda").length;
@@ -2111,28 +2125,31 @@ if (formFicha) {
         }
       }
       agenteAtual.habilidades.lista.push({
-        id: item.id,
+        id: item.id || Date.now(),
         nome: item.nome,
         tipo: "habilidade",
-        categoria: item.categoria,
-        custo: item.custo,
-        descricao: item.descricao,
+        categoria: item.categoria || "Geral",
+        custo: item.custo || "-",
+        descricao: item.descricao || "",
         requisito: item.requisito || "-"
       });
       renderizarHabilidadesPoderes();
       calcularEAtualizarCargaESpeed();
-      updateDoc(doc(db, "agentes", String(agenteId)), {
-        "habilidades.lista": agenteAtual.habilidades.lista
-      }).catch(e => console.error("Erro ao salvar habilidade:", e));
+      if (agenteId) {
+        updateDoc(doc(db, "agentes", String(agenteId)), {
+          "habilidades.lista": agenteAtual.habilidades.lista
+        }).catch(e => console.error("Erro ao salvar habilidade:", e));
+      }
     } else if (currentModalType === "poder") {
+      if (!agenteAtual.habilidades) agenteAtual.habilidades = { lista: [], rituais: [] };
       if (!Array.isArray(agenteAtual.habilidades.lista)) agenteAtual.habilidades.lista = [];
       agenteAtual.habilidades.lista.push({
-        id: item.id,
+        id: item.id || Date.now(),
         nome: item.nome,
         tipo: "poder",
-        vertente: item.vertente,
-        custo: item.custo,
-        descricao: item.descricao,
+        vertente: item.vertente || "Uncanny",
+        custo: item.custo || "-",
+        descricao: item.descricao || "",
         afinidade: item.afinidade || "",
         afinidadeAtiva: false
       });
@@ -2140,34 +2157,39 @@ if (formFicha) {
       
       const numPoderes = agenteAtual.habilidades.lista.filter(x => x.tipo === "poder").length;
       const calculatedGC = 50 + numPoderes * 5;
+      if (!agenteAtual.status) agenteAtual.status = { gc: 50 };
       agenteAtual.status.gc = calculatedGC;
       const gcInput = document.getElementById("status-gc");
       if (gcInput) gcInput.value = calculatedGC;
 
-      updateDoc(doc(db, "agentes", String(agenteId)), {
-        "habilidades.lista": agenteAtual.habilidades.lista,
-        "status.gc": calculatedGC
-      }).catch(e => console.error("Erro ao salvar poder e GC:", e));
+      if (agenteId) {
+        updateDoc(doc(db, "agentes", String(agenteId)), {
+          "habilidades.lista": agenteAtual.habilidades.lista,
+          "status.gc": calculatedGC
+        }).catch(e => console.error("Erro ao salvar poder e GC:", e));
+      }
     } else if (currentModalType === "ritual") {
+      if (!agenteAtual.habilidades) agenteAtual.habilidades = { lista: [], rituais: [] };
       if (!Array.isArray(agenteAtual.habilidades.rituais)) agenteAtual.habilidades.rituais = [];
       agenteAtual.habilidades.rituais.push({
-        id: item.id,
+        id: item.id || Date.now(),
         nome: item.nome,
-        circulo: item.circulo,
-        aspecto: item.aspecto,
-        custo: item.custo,
-        alc: item.alc,
-        target: item.target,
-        duracao: item.duracao,
-        resistencia: item.resistencia,
+        circulo: item.circulo || "Básico",
+        aspecto: item.aspecto || "-",
+        custo: item.custo || "-",
+        alc: item.alc || "-",
+        target: item.target || "-",
+        duracao: item.duracao || "-",
+        resistencia: item.resistencia || "-",
         condicao: item.condicao || "-",
-        desc: item.desc
+        desc: item.desc || ""
       });
       renderizarRituais();
-      salvarRituaisNuvem();
+      if (agenteId) salvarRituaisNuvem();
     }
 
-    document.getElementById("regras-selecao-modal").classList.add("hidden");
+    const modal = document.getElementById("regras-selecao-modal");
+    if (modal) modal.classList.add("hidden");
   }
 
   window.removerTrauma = (index) => {
@@ -2256,6 +2278,7 @@ if (formFicha) {
   };
 
   function salvarEquipamentosNuvem() {
+    if (!agenteId) return;
     updateDoc(doc(db, "agentes", String(agenteId)), {
       "inventario.equipamentos": agenteAtual.inventario.equipamentos
     }).catch(e => console.error("Erro ao salvar equipamentos:", e));
@@ -2284,6 +2307,7 @@ if (formFicha) {
   };
 
   function salvarBensMateriaisNuvem() {
+    if (!agenteId) return;
     updateDoc(doc(db, "agentes", String(agenteId)), {
       "recursos.bens_materiais": agenteAtual.recursos.bens_materiais
     }).catch(e => console.error("Erro ao salvar bens materiais:", e));
@@ -2304,14 +2328,18 @@ if (formFicha) {
       const gcInput = document.getElementById("status-gc");
       if (gcInput) gcInput.value = calculatedGC;
       
-      updateDoc(doc(db, "agentes", String(agenteId)), {
-        "habilidades.lista": agenteAtual.habilidades.lista,
-        "status.gc": calculatedGC
-      }).catch(e => console.error("Erro ao salvar lista de habilidades e GC:", e));
+      if (agenteId) {
+        updateDoc(doc(db, "agentes", String(agenteId)), {
+          "habilidades.lista": agenteAtual.habilidades.lista,
+          "status.gc": calculatedGC
+        }).catch(e => console.error("Erro ao salvar lista de habilidades e GC:", e));
+      }
     } else {
-      updateDoc(doc(db, "agentes", String(agenteId)), {
-        "habilidades.lista": agenteAtual.habilidades.lista
-      }).catch(e => console.error("Erro ao salvar lista de habilidades:", e));
+      if (agenteId) {
+        updateDoc(doc(db, "agentes", String(agenteId)), {
+          "habilidades.lista": agenteAtual.habilidades.lista
+        }).catch(e => console.error("Erro ao salvar lista de habilidades:", e));
+      }
     }
   };
 
@@ -2319,9 +2347,11 @@ if (formFicha) {
     if (isReadOnly || !agenteAtual?.habilidades?.lista?.[index]) return;
     agenteAtual.habilidades.lista[index].afinidadeAtiva = !!ativa;
     renderizarHabilidadesPoderes();
-    updateDoc(doc(db, "agentes", String(agenteId)), {
-      "habilidades.lista": agenteAtual.habilidades.lista
-    }).catch(err => console.error("Erro ao salvar afinidade do poder:", err));
+    if (agenteId) {
+      updateDoc(doc(db, "agentes", String(agenteId)), {
+        "habilidades.lista": agenteAtual.habilidades.lista
+      }).catch(err => console.error("Erro ao salvar afinidade do poder:", err));
+    }
   };
 
   window.removerRitual = (index) => {
@@ -2332,6 +2362,7 @@ if (formFicha) {
   };
 
   function salvarRituaisNuvem() {
+    if (!agenteId) return;
     updateDoc(doc(db, "agentes", String(agenteId)), {
       "habilidades.rituais": agenteAtual.habilidades.rituais
     }).catch(e => console.error("Erro ao salvar rituais:", e));
@@ -2696,10 +2727,6 @@ if (formFicha) {
           <input type="number" step="0.1" id="editor-arma-peso" value="${item.peso || 0}" min="0" />
         </div>
       </div>
-      <div class="item-editor-group">
-        <label for="editor-arma-desc">Descrição / Efeitos Especiais:</label>
-        <textarea id="editor-arma-desc" rows="4" placeholder="Propriedades ou efeitos...">${escapeHtml(item.desc || item.descricao || "")}</textarea>
-      </div>
     `;
 
     modal.classList.remove("hidden");
@@ -2874,8 +2901,8 @@ if (formFicha) {
           const munMax = parseInt(document.getElementById("editor-arma-mun").value) || 0;
           const fa = document.getElementById("editor-arma-fa").value.trim() || "-";
           const peso = parseFloat(document.getElementById("editor-arma-peso").value) || 0;
-          const desc = document.getElementById("editor-arma-desc").value.trim();
 
+          if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], carga: 0, peso: "0 kg" };
           if (!Array.isArray(agenteAtual.inventario.equipamentos)) agenteAtual.inventario.equipamentos = [];
           const existing = !isNew ? agenteAtual.inventario.equipamentos[index] : null;
           const armaObj = {
@@ -2892,8 +2919,7 @@ if (formFicha) {
             fa,
             peso,
             qtd: existing?.qtd || 1,
-            melhorias: existing?.melhorias || [],
-            desc
+            melhorias: existing?.melhorias || []
           };
 
           if (isNew) {
@@ -2965,6 +2991,9 @@ if (formFicha) {
     }
   };
 
+  setupInteractiveButtons();
+  renderizarTudoInterativo();
+
   // Lógica de Modo Escuro
   const btnDarkMode = document.getElementById("btn-dark-mode");
   
@@ -3019,6 +3048,13 @@ if (formFicha) {
   }
 
   function carregarFichaNaTela() {
+    if (!agenteId) {
+      renderizarTudoInterativo();
+      setupInteractiveButtons();
+      atualizarIndicadoresPericiaDiv5();
+      return;
+    }
+
     const docRef = doc(db, "agentes", String(agenteId));
 
     // O "onSnapshot" mantém a ficha atualizada em tempo real se o mestre alterar algo!
