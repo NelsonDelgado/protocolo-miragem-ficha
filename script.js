@@ -261,7 +261,7 @@ function criarAgenteEmBranco(nomeInicial) {
       carga_moderada: "",
       carga_maxima: "",
     },
-    inventario: { carga: 0, peso: "", equipamentos: [], descricao: "" },
+    inventario: { carga: 0, peso: "", equipamentos: [], armas: [], descricao: "" },
     combate: { rd: "", defesa: "", db: "" },
     habilidades: {
       lista: [],
@@ -432,9 +432,12 @@ function normalizarAgente(agente) {
     combinado.habilidades.rituais = [];
   }
 
-  // 4. Inventário e Equipamentos
+  // 4. Inventário, Armas e Equipamentos
   if (!combinado.inventario || typeof combinado.inventario !== "object") {
-    combinado.inventario = { carga: 0, peso: "", equipamentos: [], descricao: "" };
+    combinado.inventario = { carga: 0, peso: "", equipamentos: [], armas: [], descricao: "" };
+  }
+  if (!Array.isArray(combinado.inventario.armas)) {
+    combinado.inventario.armas = [];
   }
   if (!Array.isArray(combinado.inventario.equipamentos)) {
     if (typeof combinado.inventario.equipamentos === "string" && combinado.inventario.equipamentos.trim()) {
@@ -450,6 +453,29 @@ function normalizarAgente(agente) {
       combinado.inventario.equipamentos = [];
     }
   }
+
+  // Migrar armas que porventura estavam na lista de equipamentos
+  const equipamentosNaoArmas = [];
+  combinado.inventario.equipamentos.forEach(item => {
+    const isArma = item.tipo && (
+      item.tipo.toLowerCase().includes("cc") ||
+      item.tipo.toLowerCase().includes("dist") ||
+      item.tipo.toLowerCase().includes("arma") ||
+      item.tipo.toLowerCase().includes("corpo") ||
+      item.categoria?.toLowerCase().includes("arma")
+    );
+    if (isArma) {
+      if (item.pentes === undefined) item.pentes = (item.munMax > 0 ? 1 : 0);
+      combinado.inventario.armas.push(item);
+    } else {
+      equipamentosNaoArmas.push(item);
+    }
+  });
+  combinado.inventario.equipamentos = equipamentosNaoArmas;
+
+  combinado.inventario.armas.forEach(arma => {
+    if (arma.pentes === undefined) arma.pentes = (arma.munMax > 0 ? 1 : 0);
+  });
 
   return combinado;
 }
@@ -1368,23 +1394,43 @@ if (formFicha) {
     if (cargaMaxEl) cargaMaxEl.value = `${cargaMax} kg`;
 
     let pesoTotal = 0;
-    const eqs = Array.isArray(agenteAtual.inventario?.equipamentos) ? agenteAtual.inventario.equipamentos : [];
-    eqs.forEach(eq => {
-      const q = parseInt(eq.qtd) || 1;
-      const basePeso = parseFloat(eq.peso) || 0;
+
+    // 1. Armas, Modificações e Balas (0.01 kg por munição segundo regras oficiais pág. 74)
+    const armas = Array.isArray(agenteAtual.inventario?.armas) ? agenteAtual.inventario.armas : [];
+    armas.forEach(arma => {
+      const q = parseInt(arma.qtd) || 1;
+      const basePeso = parseFloat(arma.peso) || 0;
       let extraPeso = 0;
-      if (Array.isArray(eq.melhorias)) {
-        eq.melhorias.forEach(melNome => {
+      if (Array.isArray(arma.melhorias)) {
+        arma.melhorias.forEach(melNome => {
           const modObj = REGRAS.modificacoesArmas?.find(m => m.nome === melNome);
           if (modObj && typeof modObj.peso === "number") extraPeso += modObj.peso;
         });
       }
-      pesoTotal += (basePeso + extraPeso) * q;
+
+      let pesoBalas = 0;
+      const munMax = parseInt(arma.munMax) || 0;
+      if (munMax > 0) {
+        const curMun = arma.mun !== undefined ? parseInt(arma.mun) || 0 : munMax;
+        const pentes = arma.pentes !== undefined ? parseInt(arma.pentes) || 0 : 1;
+        const totalBalas = curMun + (pentes * munMax);
+        pesoBalas = totalBalas * 0.01;
+      }
+
+      pesoTotal += (basePeso + extraPeso + pesoBalas) * q;
+    });
+
+    // 2. Equipamentos Gerais
+    const eqs = Array.isArray(agenteAtual.inventario?.equipamentos) ? agenteAtual.inventario.equipamentos : [];
+    eqs.forEach(eq => {
+      const q = parseInt(eq.qtd) || 1;
+      const basePeso = parseFloat(eq.peso) || 0;
+      pesoTotal += basePeso * q;
     });
 
     const pesoTotalEl = document.getElementById("inventario-peso");
     if (pesoTotalEl) {
-      pesoTotalEl.value = `${pesoTotal.toFixed(1)} kg`;
+      pesoTotalEl.value = `${pesoTotal.toFixed(2)} kg`;
     }
   }
 
@@ -1428,6 +1474,107 @@ if (formFicha) {
     });
   }
 
+  function renderizarArmas() {
+    const container = document.getElementById("inventario-armas-lista");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const armas = Array.isArray(agenteAtual?.inventario?.armas) ? agenteAtual.inventario.armas : [];
+    if (armas.length === 0) {
+      container.innerHTML = '<p style="color: var(--muted); font-style: italic; font-size: 11px; margin: 0;">Nenhuma arma no inventário.</p>';
+      return;
+    }
+
+    armas.forEach((arma, index) => {
+      const card = document.createElement("div");
+      card.className = "interactive-item-card";
+
+      let detailsStr = `<strong>${escapeHtml(arma.tipo || arma.categoria || "Arma")}</strong>`;
+      if (arma.dano && arma.dano !== "-") detailsStr += ` | Dano: <strong>${escapeHtml(arma.dano)}</strong>${arma.danoTipo && arma.danoTipo !== "-" ? ` (${escapeHtml(arma.danoTipo)})` : ""}`;
+      if (arma.alc && arma.alc !== "-") detailsStr += ` | Alc: <strong>${escapeHtml(arma.alc)}</strong>`;
+      if (arma.atq && arma.atq !== "-") detailsStr += ` | Atq: <strong>${escapeHtml(String(arma.atq))}</strong>`;
+      if (arma.fa && arma.fa !== "-") detailsStr += ` | Fa: <strong>${escapeHtml(String(arma.fa))}</strong>`;
+      detailsStr += ` | Peso: <strong>${arma.peso} kg</strong>`;
+
+      const munMax = parseInt(arma.munMax) || 0;
+      const isAtaqueDisparo = munMax > 0;
+      const curMun = arma.mun !== undefined ? parseInt(arma.mun) || 0 : munMax;
+      const pentes = arma.pentes !== undefined ? parseInt(arma.pentes) || 0 : 1;
+      const totalBalas = curMun + (pentes * munMax);
+      const pesoBalas = totalBalas * 0.01;
+
+      let controlsHtml = `
+        <div class="item-card-controls" style="flex-wrap: wrap; gap: 8px; margin-top: 6px;">
+          <label>Qtd:
+            <input type="number" min="1" value="${arma.qtd || 1}" ${isReadOnly ? "disabled" : ""} onchange="window.alterarQuantidadeArma(${index}, this.value)" style="width: 40px;" />
+          </label>
+      `;
+
+      if (isAtaqueDisparo) {
+        controlsHtml += `
+          <label style="margin-left: 4px;">Balas no Pente:
+            <input type="number" min="0" max="${munMax}" value="${curMun}" ${isReadOnly ? "disabled" : ""} onchange="window.alterarMunicaoArma(${index}, this.value)" style="width: 45px;" />
+            / ${munMax}
+          </label>
+          <label style="margin-left: 4px;">Pentes Extras:
+            <input type="number" min="0" value="${pentes}" ${isReadOnly ? "disabled" : ""} onchange="window.alterarPentesArma(${index}, this.value)" style="width: 45px;" />
+          </label>
+        `;
+      }
+
+      controlsHtml += `</div>`;
+
+      if (isAtaqueDisparo) {
+        controlsHtml += `
+          <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">
+            Munição total: <strong>${totalBalas} balas</strong> (${pesoBalas.toFixed(2)} kg)
+          </div>
+        `;
+      }
+
+      const modsList = Array.isArray(arma.melhorias) ? arma.melhorias : [];
+      const upgradesHtml = `
+        <div class="item-card-upgrades" style="margin-top: 6px; padding-top: 4px; border-top: 1px dashed rgba(128,128,128,0.2); font-size: 11px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px;">
+            <span><strong>Modificações:</strong></span>
+            ${!isReadOnly ? `
+              <select onchange="if(this.value){window.adicionarModificacaoArma(${index}, this.value); this.value='';}" style="font-size: 11px; padding: 1px 4px; height: 22px; width: auto; max-width: 175px;">
+                <option value="">+ Modificação...</option>
+                ${(REGRAS.modificacoesArmas || []).filter(mod => !modsList.includes(mod.nome)).map(mod => `
+                  <option value="${escapeHtml(mod.nome)}">${escapeHtml(mod.nome)} (+${mod.peso}kg)</option>
+                `).join("")}
+              </select>
+            ` : ""}
+          </div>
+          <div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
+            ${modsList.length > 0 ? modsList.map(m => `
+              <span style="display: inline-flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.06); padding: 1px 6px; border-radius: 3px; font-size: 10px;">
+                ${escapeHtml(m)}
+                ${!isReadOnly ? `<span onclick="window.removerModificacaoArma(${index}, '${escapeHtml(m)}')" style="cursor: pointer; font-weight: bold; color: #ff5252; margin-left: 2px;" title="Remover">×</span>` : ""}
+              </span>
+            `).join("") : '<span style="color: var(--muted); font-style: italic; font-size: 10px;">Nenhuma modificação anexada.</span>'}
+          </div>
+        </div>
+      `;
+
+      card.innerHTML = `
+        <div class="item-card-header">
+          <span class="item-card-title">${escapeHtml(arma.nome)}</span>
+          ${isReadOnly ? "" : `
+            <div class="item-card-actions">
+              <button type="button" class="item-card-edit" onclick="window.editarArma(${index})">Editar</button>
+              <button type="button" class="item-card-remove" onclick="window.removerArma(${index})">Remover</button>
+            </div>
+          `}
+        </div>
+        <div class="item-card-details">${detailsStr}</div>
+        ${upgradesHtml}
+        ${controlsHtml}
+      `;
+      container.appendChild(card);
+    });
+  }
+
   function renderizarEquipamentos() {
     const container = document.getElementById("inventario-equipamentos-lista");
     if (!container) return;
@@ -1443,77 +1590,15 @@ if (formFicha) {
       const card = document.createElement("div");
       card.className = "interactive-item-card";
 
-      const isArma = eq.tipo && (
-        eq.tipo.toLowerCase().includes("cc") ||
-        eq.tipo.toLowerCase().includes("dist") ||
-        eq.tipo.toLowerCase().includes("arma") ||
-        eq.tipo.toLowerCase().includes("corpo") ||
-        eq.categoria?.toLowerCase().includes("arma")
-      );
-      const isAtaqueDisparo = isArma && (eq.munMax > 0 || (typeof eq.mun === "number" && eq.mun > 0));
-      
-      let detailsStr = "";
-      if (isArma) {
-        detailsStr = `<strong>${escapeHtml(eq.tipo || eq.categoria || "Arma")}</strong>`;
-        if (eq.dano && eq.dano !== "-") detailsStr += ` | Dano: <strong>${escapeHtml(eq.dano)}</strong>${eq.danoTipo ? ` (${escapeHtml(eq.danoTipo)})` : ""}`;
-        if (eq.alc && eq.alc !== "-") detailsStr += ` | Alc: <strong>${escapeHtml(eq.alc)}</strong>`;
-        if (eq.atq && eq.atq !== "-") detailsStr += ` | Atq: <strong>${escapeHtml(String(eq.atq))}</strong>`;
-        if (eq.fa && eq.fa !== "-") detailsStr += ` | Fa: <strong>${escapeHtml(String(eq.fa))}</strong>`;
-        detailsStr += ` | Peso: <strong>${eq.peso} kg</strong>`;
-      } else {
-        detailsStr = `Peso: <strong>${eq.peso} kg</strong>`;
-        if (eq.tipo) detailsStr += ` | Tipo: ${escapeHtml(eq.tipo)}`;
-      }
+      let detailsStr = `Categoria: <strong>${escapeHtml(eq.categoria || eq.tipo || "Geral")}</strong> | Peso: <strong>${eq.peso} kg</strong>`;
 
       let controlsHtml = `
         <div class="item-card-controls">
           <label>Qtd:
             <input type="number" min="1" value="${eq.qtd || 1}" ${isReadOnly ? "disabled" : ""} onchange="window.alterarQuantidadeEquipamento(${index}, this.value)" style="width: 40px;" />
           </label>
+        </div>
       `;
-
-      if (isAtaqueDisparo) {
-        const curMun = eq.mun !== undefined ? eq.mun : eq.munMax;
-        controlsHtml += `
-          <label style="margin-left: 6px;">Munição:
-            <input type="number" min="0" max="${eq.munMax}" value="${curMun}" ${isReadOnly ? "disabled" : ""} onchange="window.alterarMunicaoEquipamento(${index}, this.value)" style="width: 45px;" />
-            / ${eq.munMax}
-          </label>
-          ${isReadOnly ? "" : `
-            <button type="button" class="btn-micro" onclick="window.recarregarArma(${index})" style="font-size: 10px; padding: 2px 6px; cursor: pointer; margin-left: 4px;" title="Recarregar ao máximo">🔄 Recarregar</button>
-          `}
-        `;
-      }
-
-      controlsHtml += `</div>`;
-
-      let upgradesHtml = "";
-      if (isArma) {
-        const modsList = Array.isArray(eq.melhorias) ? eq.melhorias : [];
-        upgradesHtml = `
-          <div class="item-card-upgrades" style="margin-top: 6px; padding-top: 4px; border-top: 1px dashed rgba(128,128,128,0.2); font-size: 11px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px;">
-              <span><strong>Modificações:</strong></span>
-              ${!isReadOnly ? `
-                <select onchange="if(this.value){window.adicionarModificacaoArma(${index}, this.value); this.value='';}" style="font-size: 11px; padding: 1px 4px; height: 22px; width: auto; max-width: 175px;">
-                  <option value="">+ Modificação...</option>
-                  ${(REGRAS.modificacoesArmas || []).filter(mod => !modsList.includes(mod.nome)).map(mod => `
-                    <option value="${escapeHtml(mod.nome)}">${escapeHtml(mod.nome)} (+${mod.peso}kg)</option>
-                  `).join("")}
-                </select>
-              ` : ""}
-            </div>
-            <div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
-              ${modsList.length > 0 ? modsList.map(m => `
-                <span style="display: inline-flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.06); padding: 1px 6px; border-radius: 3px; font-size: 10px;">
-                  ${escapeHtml(m)}
-                  ${!isReadOnly ? `<span onclick="window.removerModificacaoArma(${index}, '${escapeHtml(m)}')" style="cursor: pointer; font-weight: bold; color: #ff5252; margin-left: 2px;" title="Remover">×</span>` : ""}
-                </span>
-              `).join("") : '<span style="color: var(--muted); font-style: italic; font-size: 10px;">Nenhuma modificação anexada.</span>'}
-            </div>
-          </div>
-        `;
-      }
 
       card.innerHTML = `
         <div class="item-card-header">
@@ -1526,8 +1611,7 @@ if (formFicha) {
           `}
         </div>
         <div class="item-card-details">${detailsStr}</div>
-        ${!isArma && eq.desc ? `<div class="item-card-desc" style="font-size: 11px; margin-top: 3px;">${escapeHtml(eq.desc)}</div>` : ""}
-        ${upgradesHtml}
+        ${eq.desc || eq.descricao ? `<div class="item-card-desc" style="font-size: 11px; margin-top: 3px;">${escapeHtml(eq.desc || eq.descricao)}</div>` : ""}
         ${controlsHtml}
       `;
       container.appendChild(card);
@@ -1683,6 +1767,7 @@ if (formFicha) {
 
   function renderizarTudoInterativo() {
     renderizarTraumas();
+    renderizarArmas();
     renderizarEquipamentos();
     renderizarBensMateriais();
     renderizarHabilidadesPoderes();
@@ -1780,7 +1865,7 @@ if (formFicha) {
       title.textContent = "Adicionar Equipamento";
       filterSelect.style.display = "block";
       const cats = [
-        { val: "armas", label: "Armas (Todas)" },
+        { val: "", label: "Todos os Equipamentos" },
         { val: "explosivos", label: "Explosivos" },
         { val: "gerais", label: "Equipamentos Gerais" },
         { val: "vestimentas", label: "Vestimentas e Proteções" },
@@ -1812,9 +1897,11 @@ if (formFicha) {
               ? "+ Criar Poder Próprio"
               : (tipo === "maldicao"
                 ? "+ Criar Maldição Própria"
-                : (tipo === "arma" || tipo === "equipamento"
-                  ? "+ Criar Arma / Item Próprio"
-                  : "+ Criar Próprio"))));
+                : (tipo === "arma"
+                  ? "+ Criar Arma Própria"
+                  : (tipo === "equipamento"
+                    ? "+ Criar Equipamento Próprio"
+                    : "+ Criar Próprio")))));
         btnCustom.onclick = () => {
           modal.classList.add("hidden");
           if (tipo === "fobia" || tipo === "mania" || tipo === "ferimento" || tipo === "maldicao") {
@@ -1823,8 +1910,10 @@ if (formFicha) {
             abrirEditorHabilidadePoder(-1, tipo);
           } else if (tipo === "ritual") {
             abrirEditorRitual(-1);
-          } else if (tipo === "arma" || tipo === "equipamento") {
+          } else if (tipo === "arma") {
             abrirEditorArma(-1);
+          } else if (tipo === "equipamento") {
+            abrirEditorEquipamento(-1);
           }
         };
       } else {
@@ -1932,19 +2021,17 @@ if (formFicha) {
         items = items.filter(a => a.categoria === filterVal || a.tipo === filterVal);
       }
     } else if (currentModalType === "equipamento") {
-      const armas = (REGRAS.armas || []).map(a => ({ ...a, eqType: "armas", category: "Arma" }));
       const explosivos = (REGRAS.explosivos || []).map(e => ({ ...e, eqType: "explosivos", category: "Explosivo" }));
-      const gerais = (REGRAS.equipamentosGerais || []).map(g => ({ ...g, eqType: "gerais", category: "Geral" }));
+      const gerais = (REGRAS.equipamentosGerais || []).map(g => ({ ...g, eqType: "gerais", category: "Equipamento Geral" }));
       const vestimentas = (REGRAS.vestimentas || []).map(v => ({ ...v, eqType: "vestimentas", category: "Vestimenta" }));
-      const veu = (REGRAS.equipamentosVeu || []).map(v => ({ ...v, eqType: "veu", category: "Véu" }));
+      const veu = (REGRAS.equipamentosVeu || []).map(v => ({ ...v, eqType: "veu", category: "Equipamento do Véu" }));
 
-      if (filterVal === "armas") items = armas;
-      else if (filterVal === "explosivos") items = explosivos;
+      if (filterVal === "explosivos") items = explosivos;
       else if (filterVal === "gerais") items = gerais;
       else if (filterVal === "vestimentas") items = vestimentas;
       else if (filterVal === "veu") items = veu;
       else {
-        items = [...armas, ...explosivos, ...gerais, ...vestimentas, ...veu];
+        items = [...explosivos, ...gerais, ...vestimentas, ...veu];
       }
     } else if (currentModalType === "moradia") {
       items = REGRAS.moradias.map(m => ({ ...m, type: "moradia" }));
@@ -2068,11 +2155,11 @@ if (formFicha) {
           "perfil.traumas": agenteAtual.perfil.traumas
         }).catch(e => console.error("Erro ao salvar trauma:", e));
       }
-    } else if (currentModalType === "equipamento" || currentModalType === "arma") {
-      if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], carga: 0, peso: "0 kg" };
-      if (!Array.isArray(agenteAtual.inventario.equipamentos)) agenteAtual.inventario.equipamentos = [];
+    } else if (currentModalType === "arma") {
+      if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], armas: [], carga: 0, peso: "0 kg" };
+      if (!Array.isArray(agenteAtual.inventario.armas)) agenteAtual.inventario.armas = [];
       const munMaxNum = typeof item.mun === "number" ? item.mun : (parseInt(item.mun) || 0);
-      agenteAtual.inventario.equipamentos.push({
+      agenteAtual.inventario.armas.push({
         id: item.id || Date.now(),
         nome: item.nome,
         tipo: item.tipo || item.categoria || "Arma",
@@ -2081,12 +2168,28 @@ if (formFicha) {
         qtd: 1,
         mun: munMaxNum,
         munMax: munMaxNum,
+        pentes: munMaxNum > 0 ? 1 : 0,
         melhorias: [],
         fa: item.fa || "-",
         dano: item.dano || "-",
         danoTipo: item.danoTipo || "-",
         alc: item.alc || "-",
         atq: item.atq || "1"
+      });
+      renderizarArmas();
+      calcularEAtualizarCargaESpeed();
+      if (agenteId) salvarArmasNuvem();
+    } else if (currentModalType === "equipamento") {
+      if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], armas: [], carga: 0, peso: "0 kg" };
+      if (!Array.isArray(agenteAtual.inventario.equipamentos)) agenteAtual.inventario.equipamentos = [];
+      agenteAtual.inventario.equipamentos.push({
+        id: item.id || Date.now(),
+        nome: item.nome,
+        tipo: item.category || item.tipo || item.cat || "Equipamento",
+        categoria: item.category || item.tipo || item.cat || "Equipamento",
+        peso: typeof item.peso === "number" ? item.peso : (parseFloat(item.peso) || 0),
+        qtd: 1,
+        desc: item.desc || item.descricao || item.efeito || ""
       });
       renderizarEquipamentos();
       calcularEAtualizarCargaESpeed();
@@ -2202,8 +2305,78 @@ if (formFicha) {
     }).catch(e => console.error("Erro ao salvar traumas:", e));
   };
 
+  // Handlers para Armas
+  window.removerArma = (index) => {
+    if (isReadOnly || !agenteAtual?.inventario?.armas) return;
+    agenteAtual.inventario.armas.splice(index, 1);
+    renderizarArmas();
+    calcularEAtualizarCargaESpeed();
+    salvarArmasNuvem();
+  };
+
+  window.editarArma = (index) => {
+    abrirEditorArma(index);
+  };
+
+  window.alterarQuantidadeArma = (index, value) => {
+    if (isReadOnly || !agenteAtual?.inventario?.armas?.[index]) return;
+    const val = Math.max(1, parseInt(value) || 1);
+    agenteAtual.inventario.armas[index].qtd = val;
+    calcularEAtualizarCargaESpeed();
+    salvarArmasNuvem();
+  };
+
+  window.alterarMunicaoArma = (index, value) => {
+    if (isReadOnly || !agenteAtual?.inventario?.armas?.[index]) return;
+    const arma = agenteAtual.inventario.armas[index];
+    const val = Math.max(0, Math.min(parseInt(value) || 0, arma.munMax || 0));
+    arma.mun = val;
+    calcularEAtualizarCargaESpeed();
+    salvarArmasNuvem();
+  };
+
+  window.alterarPentesArma = (index, value) => {
+    if (isReadOnly || !agenteAtual?.inventario?.armas?.[index]) return;
+    const arma = agenteAtual.inventario.armas[index];
+    const val = Math.max(0, parseInt(value) || 0);
+    arma.pentes = val;
+    renderizarArmas();
+    calcularEAtualizarCargaESpeed();
+    salvarArmasNuvem();
+  };
+
+  window.adicionarModificacaoArma = (index, melNome) => {
+    if (isReadOnly || !agenteAtual?.inventario?.armas?.[index]) return;
+    const arma = agenteAtual.inventario.armas[index];
+    if (!Array.isArray(arma.melhorias)) arma.melhorias = [];
+    if (!arma.melhorias.includes(melNome)) {
+      arma.melhorias.push(melNome);
+      renderizarArmas();
+      calcularEAtualizarCargaESpeed();
+      salvarArmasNuvem();
+    }
+  };
+
+  window.removerModificacaoArma = (index, melNome) => {
+    if (isReadOnly || !agenteAtual?.inventario?.armas?.[index]) return;
+    const arma = agenteAtual.inventario.armas[index];
+    if (!Array.isArray(arma.melhorias)) return;
+    arma.melhorias = arma.melhorias.filter(m => m !== melNome);
+    renderizarArmas();
+    calcularEAtualizarCargaESpeed();
+    salvarArmasNuvem();
+  };
+
+  function salvarArmasNuvem() {
+    if (!agenteId) return;
+    updateDoc(doc(db, "agentes", String(agenteId)), {
+      "inventario.armas": agenteAtual.inventario.armas
+    }).catch(e => console.error("Erro ao salvar armas:", e));
+  }
+
+  // Handlers para Equipamentos Gerais
   window.removerEquipamento = (index) => {
-    if (isReadOnly) return;
+    if (isReadOnly || !agenteAtual?.inventario?.equipamentos) return;
     agenteAtual.inventario.equipamentos.splice(index, 1);
     renderizarEquipamentos();
     calcularEAtualizarCargaESpeed();
@@ -2211,68 +2384,13 @@ if (formFicha) {
   };
 
   window.editarEquipamento = (index) => {
-    abrirEditorArma(index);
+    abrirEditorEquipamento(index);
   };
 
   window.alterarQuantidadeEquipamento = (index, value) => {
-    if (isReadOnly) return;
-    const val = parseInt(value) || 1;
+    if (isReadOnly || !agenteAtual?.inventario?.equipamentos?.[index]) return;
+    const val = Math.max(1, parseInt(value) || 1);
     agenteAtual.inventario.equipamentos[index].qtd = val;
-    calcularEAtualizarCargaESpeed();
-    salvarEquipamentosNuvem();
-  };
-
-  window.alterarMunicaoEquipamento = (index, value) => {
-    if (isReadOnly) return;
-    const val = parseInt(value) || 0;
-    agenteAtual.inventario.equipamentos[index].mun = val;
-    salvarEquipamentosNuvem();
-  };
-
-  window.recarregarArma = (index) => {
-    if (isReadOnly || !agenteAtual?.inventario?.equipamentos?.[index]) return;
-    const eq = agenteAtual.inventario.equipamentos[index];
-    if (eq.munMax > 0) {
-      eq.mun = eq.munMax;
-      renderizarEquipamentos();
-      salvarEquipamentosNuvem();
-    }
-  };
-
-  window.adicionarModificacaoArma = (index, melNome) => {
-    if (isReadOnly || !agenteAtual?.inventario?.equipamentos?.[index]) return;
-    const eq = agenteAtual.inventario.equipamentos[index];
-    if (!Array.isArray(eq.melhorias)) eq.melhorias = [];
-    if (!eq.melhorias.includes(melNome)) {
-      eq.melhorias.push(melNome);
-      renderizarEquipamentos();
-      calcularEAtualizarCargaESpeed();
-      salvarEquipamentosNuvem();
-    }
-  };
-
-  window.removerModificacaoArma = (index, melNome) => {
-    if (isReadOnly || !agenteAtual?.inventario?.equipamentos?.[index]) return;
-    const eq = agenteAtual.inventario.equipamentos[index];
-    if (!Array.isArray(eq.melhorias)) return;
-    eq.melhorias = eq.melhorias.filter(m => m !== melNome);
-    renderizarEquipamentos();
-    calcularEAtualizarCargaESpeed();
-    salvarEquipamentosNuvem();
-  };
-
-  window.toggleUpgrade = (index, melNome, isChecked) => {
-    if (isReadOnly) return;
-    const eq = agenteAtual.inventario.equipamentos[index];
-    if (!Array.isArray(eq.melhorias)) eq.melhorias = [];
-    
-    if (isChecked) {
-      if (!eq.melhorias.includes(melNome)) eq.melhorias.push(melNome);
-    } else {
-      eq.melhorias = eq.melhorias.filter(m => m !== melNome);
-    }
-    
-    renderizarEquipamentos();
     calcularEAtualizarCargaESpeed();
     salvarEquipamentosNuvem();
   };
@@ -2660,9 +2778,9 @@ if (formFicha) {
   function abrirEditorArma(index) {
     if (isReadOnly || !agenteAtual) return;
     const isNew = index === -1;
-    const item = !isNew && agenteAtual.inventario?.equipamentos?.[index]
-      ? agenteAtual.inventario.equipamentos[index]
-      : { nome: "", tipo: "Corpo a Corpo - Leve", dano: "1d6 + DB", danoTipo: "C", alc: "CC", atq: "1", munMax: 0, fa: "-", peso: 1.0, desc: "" };
+    const item = !isNew && agenteAtual.inventario?.armas?.[index]
+      ? agenteAtual.inventario.armas[index]
+      : { nome: "", tipo: "Corpo a Corpo - Leve", dano: "1d6 + DB", danoTipo: "C", alc: "CC", atq: "1", munMax: 0, fa: "-", peso: 1.0, pentes: 1 };
 
     editingItemState = { category: "arma", index, isNew };
 
@@ -2689,7 +2807,6 @@ if (formFicha) {
             <option value="Distância - Leve" ${item.tipo === "Distância - Leve" ? "selected" : ""}>Distância - Leve</option>
             <option value="Distância - Pesada" ${item.tipo === "Distância - Pesada" ? "selected" : ""}>Distância - Pesada</option>
             <option value="Arma Amaldiçoada (Véu)" ${item.tipo === "Arma Amaldiçoada (Véu)" ? "selected" : ""}>Arma Amaldiçoada (Véu)</option>
-            <option value="Equipamento Geral" ${item.tipo === "Equipamento Geral" ? "selected" : ""}>Equipamento Geral</option>
           </select>
         </div>
         <div class="item-editor-group">
@@ -2719,13 +2836,65 @@ if (formFicha) {
       </div>
       <div class="item-editor-row">
         <div class="item-editor-group">
+          <label for="editor-arma-pentes">Pentes Extras:</label>
+          <input type="number" id="editor-arma-pentes" value="${item.pentes !== undefined ? item.pentes : 1}" min="0" />
+        </div>
+        <div class="item-editor-group">
           <label for="editor-arma-fa">Falha (Fa.):</label>
           <input type="text" id="editor-arma-fa" value="${escapeHtml(String(item.fa || "-"))}" placeholder="Ex: 20, 19, -" />
         </div>
+      </div>
+      <div class="item-editor-group">
+        <label for="editor-arma-peso">Peso (kg):</label>
+        <input type="number" step="0.1" id="editor-arma-peso" value="${item.peso || 0}" min="0" />
+      </div>
+    `;
+
+    modal.classList.remove("hidden");
+  }
+
+  function abrirEditorEquipamento(index) {
+    if (isReadOnly || !agenteAtual) return;
+    const isNew = index === -1;
+    const item = !isNew && agenteAtual.inventario?.equipamentos?.[index]
+      ? agenteAtual.inventario.equipamentos[index]
+      : { nome: "", categoria: "Equipamento Geral", peso: 0.5, desc: "" };
+
+    editingItemState = { category: "equipamento", index, isNew };
+
+    const modal = document.getElementById("item-editor-modal");
+    const title = document.getElementById("item-editor-title");
+    const fields = document.getElementById("item-editor-fields");
+    if (!modal || !fields) return;
+
+    if (title) {
+      title.textContent = isNew ? "Adicionar Novo Equipamento" : "Editar Equipamento";
+    }
+
+    fields.innerHTML = `
+      <div class="item-editor-group">
+        <label for="editor-eq-nome">Nome do Equipamento:</label>
+        <input type="text" id="editor-eq-nome" value="${escapeHtml(item.nome || "")}" placeholder="Ex: Lanterna tática, Colete Leve, Gazua..." required />
+      </div>
+      <div class="item-editor-row">
         <div class="item-editor-group">
-          <label for="editor-arma-peso">Peso (kg):</label>
-          <input type="number" step="0.1" id="editor-arma-peso" value="${item.peso || 0}" min="0" />
+          <label for="editor-eq-categoria">Categoria:</label>
+          <select id="editor-eq-categoria">
+            <option value="Equipamento Geral" ${item.categoria === "Equipamento Geral" ? "selected" : ""}>Equipamento Geral</option>
+            <option value="Explosivo" ${item.categoria === "Explosivo" ? "selected" : ""}>Explosivo</option>
+            <option value="Vestimenta" ${item.categoria === "Vestimenta" ? "selected" : ""}>Vestimenta e Proteção</option>
+            <option value="Equipamento do Véu" ${item.categoria === "Equipamento do Véu" ? "selected" : ""}>Equipamento do Véu</option>
+            <option value="Outro" ${item.categoria === "Outro" ? "selected" : ""}>Outro</option>
+          </select>
         </div>
+        <div class="item-editor-group">
+          <label for="editor-eq-peso">Peso (kg):</label>
+          <input type="number" step="0.1" id="editor-eq-peso" value="${item.peso || 0}" min="0" />
+        </div>
+      </div>
+      <div class="item-editor-group">
+        <label for="editor-eq-desc">Descrição / Efeito:</label>
+        <textarea id="editor-eq-desc" rows="4" placeholder="Descrição ou efeito do equipamento...">${escapeHtml(item.desc || item.descricao || "")}</textarea>
       </div>
     `;
 
@@ -2901,10 +3070,11 @@ if (formFicha) {
           const munMax = parseInt(document.getElementById("editor-arma-mun").value) || 0;
           const fa = document.getElementById("editor-arma-fa").value.trim() || "-";
           const peso = parseFloat(document.getElementById("editor-arma-peso").value) || 0;
+          const pentes = Math.max(0, parseInt(document.getElementById("editor-arma-pentes")?.value) || (munMax > 0 ? 1 : 0));
 
-          if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], carga: 0, peso: "0 kg" };
-          if (!Array.isArray(agenteAtual.inventario.equipamentos)) agenteAtual.inventario.equipamentos = [];
-          const existing = !isNew ? agenteAtual.inventario.equipamentos[index] : null;
+          if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], armas: [], carga: 0, peso: "0 kg" };
+          if (!Array.isArray(agenteAtual.inventario.armas)) agenteAtual.inventario.armas = [];
+          const existing = !isNew ? agenteAtual.inventario.armas[index] : null;
           const armaObj = {
             id: isNew ? Date.now() : (existing?.id || Date.now()),
             nome,
@@ -2916,6 +3086,7 @@ if (formFicha) {
             atq,
             mun: isNew ? munMax : (existing?.mun !== undefined ? existing.mun : munMax),
             munMax,
+            pentes,
             fa,
             peso,
             qtd: existing?.qtd || 1,
@@ -2923,9 +3094,38 @@ if (formFicha) {
           };
 
           if (isNew) {
-            agenteAtual.inventario.equipamentos.push(armaObj);
+            agenteAtual.inventario.armas.push(armaObj);
           } else {
-            agenteAtual.inventario.equipamentos[index] = armaObj;
+            agenteAtual.inventario.armas[index] = armaObj;
+          }
+
+          renderizarArmas();
+          calcularEAtualizarCargaESpeed();
+          salvarArmasNuvem();
+        } else if (category === "equipamento") {
+          const nome = document.getElementById("editor-eq-nome").value.trim();
+          if (!nome) return alert("Por favor, preencha o nome do equipamento.");
+          const categoria = document.getElementById("editor-eq-categoria").value;
+          const peso = parseFloat(document.getElementById("editor-eq-peso").value) || 0;
+          const desc = document.getElementById("editor-eq-desc").value.trim();
+
+          if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], armas: [], carga: 0, peso: "0 kg" };
+          if (!Array.isArray(agenteAtual.inventario.equipamentos)) agenteAtual.inventario.equipamentos = [];
+          const existing = !isNew ? agenteAtual.inventario.equipamentos[index] : null;
+          const eqObj = {
+            id: isNew ? Date.now() : (existing?.id || Date.now()),
+            nome,
+            tipo: categoria,
+            categoria,
+            peso,
+            qtd: existing?.qtd || 1,
+            desc
+          };
+
+          if (isNew) {
+            agenteAtual.inventario.equipamentos.push(eqObj);
+          } else {
+            agenteAtual.inventario.equipamentos[index] = eqObj;
           }
 
           renderizarEquipamentos();

@@ -1108,9 +1108,12 @@ input[type="number"]::-webkit-outer-spin-button {
   min-height: 260px;
 }
 
+.attacks-box .interactive-container,
 .equipment-box .interactive-container,
 .goods-box .interactive-container {
   min-height: 285px;
+  max-height: 380px;
+  overflow-y: auto;
   border-width: 0;
   border-top: 1px solid var(--line);
   padding: 8px 0;

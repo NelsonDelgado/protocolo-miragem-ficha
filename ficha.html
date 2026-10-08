@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ficha do Agente - Protocolo Miragem</title>
-    <link rel="stylesheet" href="style.css?v=26" />
+    <link rel="stylesheet" href="style.css?v=27" />
   </head>
   <body class="ficha-body">
     <!-- Botão Flutuante de Modo Escuro Minimalista -->
@@ -1477,10 +1477,7 @@
             <div class="boxed-area equipment-box">
               <span>EQUIPAMENTOS</span>
               <div id="inventario-equipamentos-lista" class="interactive-container"></div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px;">
-                <button type="button" id="btn-add-arma" class="interactive-add-btn" style="margin-top:0;">+ Arma</button>
-                <button type="button" id="btn-add-equipamento" class="interactive-add-btn" style="margin-top:0;">+ Equipamento</button>
-              </div>
+              <button type="button" id="btn-add-equipamento" class="interactive-add-btn">+ Equipamento</button>
             </div>
             <div class="boxed-area goods-box">
               <span>BENS MATERIAIS</span>
@@ -1513,8 +1510,9 @@
 
         <section class="sheet-page page-four">
           <div class="boxed-area attacks-box">
-            <span>DESCRIÇÃO DOS EQUIPAMENTOS E ATAQUES:</span>
-            <textarea id="inventario-descricao" rows="10"></textarea>
+            <span>ARMAS</span>
+            <div id="inventario-armas-lista" class="interactive-container"></div>
+            <button type="button" id="btn-add-arma" class="interactive-add-btn">+ Arma</button>
           </div>
 
           <div class="combat-strip">
@@ -1682,6 +1680,6 @@
       </div>
     </div>
 
-    <script type="module" src="script.js?v=44"></script>
+    <script type="module" src="script.js?v=45"></script>
   </body>
 </html>
