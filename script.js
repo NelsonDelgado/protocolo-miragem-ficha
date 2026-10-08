@@ -454,27 +454,47 @@ function normalizarAgente(agente) {
     }
   }
 
-  // Migrar armas que porventura estavam na lista de equipamentos
-  const equipamentosNaoArmas = [];
-  combinado.inventario.equipamentos.forEach(item => {
-    const isArma = item.tipo && (
-      item.tipo.toLowerCase().includes("cc") ||
-      item.tipo.toLowerCase().includes("dist") ||
-      item.tipo.toLowerCase().includes("arma") ||
-      item.tipo.toLowerCase().includes("corpo") ||
-      item.categoria?.toLowerCase().includes("arma")
-    );
-    if (isArma) {
-      if (item.pentes === undefined) item.pentes = (item.munMax > 0 ? 1 : 0);
-      combinado.inventario.armas.push(item);
-    } else {
-      equipamentosNaoArmas.push(item);
-    }
-  });
-  combinado.inventario.equipamentos = equipamentosNaoArmas;
+  // Migrar armas antigas da lista de equipamentos apenas se armas estiver vazio
+  if (combinado.inventario.armas.length === 0) {
+    const equipamentosNaoArmas = [];
+    combinado.inventario.equipamentos.forEach(item => {
+      const isArma = item.tipo && (
+        item.tipo.toLowerCase().includes("cc") ||
+        item.tipo.toLowerCase().includes("dist") ||
+        item.tipo.toLowerCase().includes("arma") ||
+        item.tipo.toLowerCase().includes("corpo") ||
+        item.categoria?.toLowerCase().includes("arma")
+      );
+      if (isArma) {
+        if (item.pentes === undefined) item.pentes = (item.munMax > 0 ? 1 : 0);
+        combinado.inventario.armas.push(item);
+      } else {
+        equipamentosNaoArmas.push(item);
+      }
+    });
+    combinado.inventario.equipamentos = equipamentosNaoArmas;
+  } else {
+    // Se a lista de armas já possui itens, limpamos qualquer arma que sobrou em equipamentos
+    combinado.inventario.equipamentos = combinado.inventario.equipamentos.filter(item => {
+      const isArma = item.tipo && (
+        item.tipo.toLowerCase().includes("cc") ||
+        item.tipo.toLowerCase().includes("dist") ||
+        item.tipo.toLowerCase().includes("arma") ||
+        item.tipo.toLowerCase().includes("corpo") ||
+        item.categoria?.toLowerCase().includes("arma")
+      );
+      return !isArma;
+    });
+  }
 
-  combinado.inventario.armas.forEach(arma => {
+  // Deduplicar armas por ID para limpar duplicatas indesejadas
+  const armasIds = new Set();
+  combinado.inventario.armas = combinado.inventario.armas.filter(arma => {
+    const key = arma.id ? String(arma.id) : (arma.nome + "_" + arma.tipo);
+    if (armasIds.has(key)) return false;
+    armasIds.add(key);
     if (arma.pentes === undefined) arma.pentes = (arma.munMax > 0 ? 1 : 0);
+    return true;
   });
 
   return combinado;
@@ -2331,6 +2351,7 @@ if (formFicha) {
     const arma = agenteAtual.inventario.armas[index];
     const val = Math.max(0, Math.min(parseInt(value) || 0, arma.munMax || 0));
     arma.mun = val;
+    renderizarArmas();
     calcularEAtualizarCargaESpeed();
     salvarArmasNuvem();
   };
@@ -2370,7 +2391,8 @@ if (formFicha) {
   function salvarArmasNuvem() {
     if (!agenteId) return;
     updateDoc(doc(db, "agentes", String(agenteId)), {
-      "inventario.armas": agenteAtual.inventario.armas
+      "inventario.armas": agenteAtual.inventario.armas,
+      "inventario.equipamentos": agenteAtual.inventario.equipamentos
     }).catch(e => console.error("Erro ao salvar armas:", e));
   }
 
@@ -2398,6 +2420,7 @@ if (formFicha) {
   function salvarEquipamentosNuvem() {
     if (!agenteId) return;
     updateDoc(doc(db, "agentes", String(agenteId)), {
+      "inventario.armas": agenteAtual.inventario.armas,
       "inventario.equipamentos": agenteAtual.inventario.equipamentos
     }).catch(e => console.error("Erro ao salvar equipamentos:", e));
   }
