@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ficha do Agente - Protocolo Miragem</title>
-    <link rel="stylesheet" href="style.css?v=24" />
+    <link rel="stylesheet" href="style.css?v=25" />
   </head>
   <body class="ficha-body">
     <!-- Botão Flutuante de Modo Escuro Minimalista -->
@@ -1476,7 +1476,11 @@
             </label>
             <div class="boxed-area equipment-box">
               <span>EQUIPAMENTOS</span>
-              <textarea id="inventario-equipamentos" rows="10"></textarea>
+              <div id="inventario-equipamentos-lista" class="interactive-container"></div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px;">
+                <button type="button" id="btn-add-arma" class="interactive-add-btn" style="margin-top:0;">+ Arma</button>
+                <button type="button" id="btn-add-equipamento" class="interactive-add-btn" style="margin-top:0;">+ Equipamento</button>
+              </div>
             </div>
             <div class="boxed-area goods-box">
               <span>BENS MATERIAIS</span>
@@ -1678,6 +1682,6 @@
       </div>
     </div>
 
-    <script type="module" src="script.js?v=42"></script>
+    <script type="module" src="script.js?v=43"></script>
   </body>
 </html>
