@@ -1611,6 +1611,7 @@ if (formFicha) {
       card.className = "interactive-item-card";
 
       let detailsStr = `Categoria: <strong>${escapeHtml(eq.categoria || eq.tipo || "Geral")}</strong> | Peso: <strong>${eq.peso} kg</strong>`;
+      if (eq.preco != null && eq.preco !== "") detailsStr += ` | Preço: <strong>${eq.preco} €</strong>`;
 
       let controlsHtml = `
         <div class="item-card-controls">
@@ -2120,9 +2121,9 @@ if (formFicha) {
         if (item.mun && item.mun !== "-") detailsStr += ` | Mun: <strong>${item.mun}</strong>`;
         descStr = ""; // Armas não possuem descrição nas regras oficiais
       } else if (currentModalType === "equipamento") {
-        detailsStr = `${item.category} | Peso: ${item.peso} kg`;
-        if (item.cat) detailsStr += ` | Categoria: ${item.cat}`;
-        if (item.dano) detailsStr += ` | Dano: ${item.dano}`;
+        detailsStr = `Categoria: <strong>${item.category || item.cat || "Geral"}</strong> | Peso: <strong>${item.peso} kg</strong>`;
+        if (item.preco != null) detailsStr += ` | Preço: <strong>${item.preco} €</strong>`;
+        if (item.dano) detailsStr += ` | Dano: <strong>${item.dano}</strong>`;
       } else if (currentModalType === "moradia") {
         detailsStr = `Custo: ${item.preco} Créditos`;
       } else if (currentModalType === "veiculo") {
@@ -2207,6 +2208,7 @@ if (formFicha) {
         nome: item.nome,
         tipo: item.category || item.tipo || item.cat || "Equipamento",
         categoria: item.category || item.tipo || item.cat || "Equipamento",
+        preco: item.preco != null ? item.preco : 0,
         peso: typeof item.peso === "number" ? item.peso : (parseFloat(item.peso) || 0),
         qtd: 1,
         desc: item.desc || item.descricao || item.efeito || ""
@@ -2911,6 +2913,10 @@ if (formFicha) {
           </select>
         </div>
         <div class="item-editor-group">
+          <label for="editor-eq-preco">Preço (€):</label>
+          <input type="number" step="1" id="editor-eq-preco" value="${item.preco != null ? item.preco : 0}" min="0" />
+        </div>
+        <div class="item-editor-group">
           <label for="editor-eq-peso">Peso (kg):</label>
           <input type="number" step="0.1" id="editor-eq-peso" value="${item.peso || 0}" min="0" />
         </div>
@@ -3129,6 +3135,7 @@ if (formFicha) {
           const nome = document.getElementById("editor-eq-nome").value.trim();
           if (!nome) return alert("Por favor, preencha o nome do equipamento.");
           const categoria = document.getElementById("editor-eq-categoria").value;
+          const preco = parseFloat(document.getElementById("editor-eq-preco")?.value) || 0;
           const peso = parseFloat(document.getElementById("editor-eq-peso").value) || 0;
           const desc = document.getElementById("editor-eq-desc").value.trim();
 
@@ -3140,6 +3147,7 @@ if (formFicha) {
             nome,
             tipo: categoria,
             categoria,
+            preco,
             peso,
             qtd: existing?.qtd || 1,
             desc
