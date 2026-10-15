@@ -292,6 +292,24 @@ function combinarEstruturaPadrao(padrao, agente) {
   return combinado;
 }
 
+function sanitizarParaFirestore(val) {
+  if (val === undefined) return null;
+  if (val === null || typeof val !== "object") return val;
+  if (Array.isArray(val)) {
+    return val
+      .map(v => (v === undefined ? null : sanitizarParaFirestore(v)))
+      .filter(v => v !== undefined);
+  }
+  const limpo = {};
+  Object.keys(val).forEach(k => {
+    const v = val[k];
+    if (v !== undefined) {
+      limpo[k] = sanitizarParaFirestore(v);
+    }
+  });
+  return limpo;
+}
+
 function normalizarAgente(agente) {
   const nome = agente && agente.identidade ? agente.identidade.nome : "";
   const combinado = combinarEstruturaPadrao(criarAgenteEmBranco(nome), agente || {});
@@ -2205,165 +2223,177 @@ if (formFicha) {
     if (isReadOnly) return;
     if (!agenteAtual) agenteAtual = criarAgenteEmBranco("Agente");
 
-    if (currentModalType === "fobia" || currentModalType === "mania" || currentModalType === "ferimento" || currentModalType === "maldicao") {
-      if (!agenteAtual.perfil) agenteAtual.perfil = { traumas: [] };
-      if (!Array.isArray(agenteAtual.perfil.traumas)) agenteAtual.perfil.traumas = [];
-      const itemTipo = item.tipo || item.type || currentModalType;
-      agenteAtual.perfil.traumas.push({
-        id: item.id || Date.now(),
-        nome: item.nome,
-        type: itemTipo,
-        tipo: itemTipo,
-        efeito: item.descricao || item.efeito || item.desc || ""
-      });
-      renderizarTraumas();
-      calcularEAtualizarCargaESpeed();
-      if (agenteId) {
-        updateDoc(doc(db, "agentes", String(agenteId)), {
-          "perfil.traumas": agenteAtual.perfil.traumas
-        }).catch(e => console.error("Erro ao salvar trauma:", e));
-      }
-    } else if (currentModalType === "arma") {
-      if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], armas: [], carga: 0, peso: "0 kg" };
-      if (!Array.isArray(agenteAtual.inventario.armas)) agenteAtual.inventario.armas = [];
-      const munMaxNum = typeof item.mun === "number" ? item.mun : (parseInt(item.mun) || 0);
-      agenteAtual.inventario.armas.push({
-        id: item.id || Date.now(),
-        nome: item.nome,
-        tipo: item.tipo || item.categoria || "Arma",
-        categoria: item.categoria || item.tipo || "Arma",
-        peso: typeof item.peso === "number" ? item.peso : (parseFloat(item.peso) || 0),
-        qtd: 1,
-        mun: munMaxNum,
-        munMax: munMaxNum,
-        pentes: munMaxNum > 0 ? 1 : 0,
-        melhorias: [],
-        fa: item.fa || "-",
-        dano: item.dano || "-",
-        danoTipo: item.danoTipo || "-",
-        alc: item.alc || "-",
-        atq: item.atq || "1"
-      });
-      renderizarArmas();
-      calcularEAtualizarCargaESpeed();
-      if (agenteId) salvarArmasNuvem();
-    } else if (currentModalType === "equipamento") {
-      if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], armas: [], carga: 0, peso: "0 kg" };
-      if (!Array.isArray(agenteAtual.inventario.equipamentos)) agenteAtual.inventario.equipamentos = [];
-      agenteAtual.inventario.equipamentos.push({
-        id: item.id || Date.now(),
-        nome: item.nome,
-        tipo: item.category || item.tipo || item.cat || "Equipamento",
-        categoria: item.category || item.tipo || item.cat || "Equipamento",
-        preco: item.preco != null ? item.preco : 0,
-        peso: typeof item.peso === "number" ? item.peso : (parseFloat(item.peso) || 0),
-        rd: item.rd != null ? item.rd : undefined,
-        dano: item.dano || undefined,
-        qtd: 1,
-        desc: item.desc || item.descricao || item.efeito || ""
-      });
-      renderizarEquipamentos();
-      calcularEAtualizarCargaESpeed();
-      if (agenteId) salvarEquipamentosNuvem();
-    } else if (currentModalType === "moradia") {
-      if (!agenteAtual.recursos) agenteAtual.recursos = { bens_materiais: [] };
-      if (!Array.isArray(agenteAtual.recursos.bens_materiais)) agenteAtual.recursos.bens_materiais = [];
-      agenteAtual.recursos.bens_materiais.push({
-        id: item.id || Date.now(),
-        nome: item.nome,
-        tipo: "moradia",
-        preco: item.preco || 0,
-        upgrades: []
-      });
-      renderizarBensMateriais();
-      if (agenteId) salvarBensMateriaisNuvem();
-    } else if (currentModalType === "veiculo") {
-      if (!agenteAtual.recursos) agenteAtual.recursos = { bens_materiais: [] };
-      if (!Array.isArray(agenteAtual.recursos.bens_materiais)) agenteAtual.recursos.bens_materiais = [];
-      agenteAtual.recursos.bens_materiais.push({
-        id: item.id || Date.now(),
-        nome: item.nome,
-        tipo: "veiculo",
-        preco: item.preco || 0,
-        velocidade: item.velocidade || "N/A"
-      });
-      renderizarBensMateriais();
-      if (agenteId) salvarBensMateriaisNuvem();
-    } else if (currentModalType === "habilidade") {
-      if (!agenteAtual.habilidades) agenteAtual.habilidades = { lista: [], rituais: [] };
-      if (!Array.isArray(agenteAtual.habilidades.lista)) agenteAtual.habilidades.lista = [];
-      if (item.categoria === "Banda") {
-        const totalBanda = agenteAtual.habilidades.lista.filter(x => x.categoria === "Banda").length;
-        if (totalBanda >= 2) {
-          return alert("Limite das Regras: Cada personagem pode ter no máximo 2 Habilidades de Banda.");
+    try {
+      if (currentModalType === "fobia" || currentModalType === "mania" || currentModalType === "ferimento" || currentModalType === "maldicao") {
+        if (!agenteAtual.perfil) agenteAtual.perfil = { traumas: [] };
+        if (!Array.isArray(agenteAtual.perfil.traumas)) agenteAtual.perfil.traumas = [];
+        const itemTipo = item.tipo || item.type || currentModalType;
+        agenteAtual.perfil.traumas.push({
+          id: item.id || Date.now(),
+          nome: item.nome,
+          type: itemTipo,
+          tipo: itemTipo,
+          efeito: item.descricao || item.efeito || item.desc || ""
+        });
+        renderizarTraumas();
+        calcularEAtualizarCargaESpeed();
+        if (agenteId) {
+          updateDoc(doc(db, "agentes", String(agenteId)), sanitizarParaFirestore({
+            "perfil.traumas": agenteAtual.perfil.traumas
+          })).catch(e => console.error("Erro ao salvar trauma:", e));
         }
-      }
-      agenteAtual.habilidades.lista.push({
-        id: item.id || Date.now(),
-        nome: item.nome,
-        tipo: "habilidade",
-        categoria: item.categoria || "Geral",
-        custo: item.custo || "-",
-        descricao: item.descricao || "",
-        requisito: item.requisito || "-"
-      });
-      renderizarHabilidadesPoderes();
-      calcularEAtualizarCargaESpeed();
-      if (agenteId) {
-        updateDoc(doc(db, "agentes", String(agenteId)), {
-          "habilidades.lista": agenteAtual.habilidades.lista
-        }).catch(e => console.error("Erro ao salvar habilidade:", e));
-      }
-    } else if (currentModalType === "poder") {
-      if (!agenteAtual.habilidades) agenteAtual.habilidades = { lista: [], rituais: [] };
-      if (!Array.isArray(agenteAtual.habilidades.lista)) agenteAtual.habilidades.lista = [];
-      agenteAtual.habilidades.lista.push({
-        id: item.id || Date.now(),
-        nome: item.nome,
-        tipo: "poder",
-        vertente: item.vertente || "Uncanny",
-        custo: item.custo || "-",
-        descricao: item.descricao || "",
-        afinidade: item.afinidade || "",
-        afinidadeAtiva: false
-      });
-      renderizarHabilidadesPoderes();
-      
-      const numPoderes = agenteAtual.habilidades.lista.filter(x => x.tipo === "poder").length;
-      const calculatedGC = 50 + numPoderes * 5;
-      if (!agenteAtual.status) agenteAtual.status = { gc: 50 };
-      agenteAtual.status.gc = calculatedGC;
-      const gcInput = document.getElementById("status-gc");
-      if (gcInput) gcInput.value = calculatedGC;
+      } else if (currentModalType === "arma") {
+        if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], armas: [], carga: 0, peso: "0 kg" };
+        if (!Array.isArray(agenteAtual.inventario.armas)) agenteAtual.inventario.armas = [];
+        const munMaxNum = typeof item.mun === "number" ? item.mun : (parseInt(item.mun) || 0);
+        agenteAtual.inventario.armas.push({
+          id: item.id || Date.now(),
+          nome: item.nome,
+          tipo: item.tipo || item.categoria || "Arma",
+          categoria: item.categoria || item.tipo || "Arma",
+          peso: typeof item.peso === "number" ? item.peso : (parseFloat(item.peso) || 0),
+          qtd: 1,
+          mun: munMaxNum,
+          munMax: munMaxNum,
+          pentes: munMaxNum > 0 ? 1 : 0,
+          melhorias: [],
+          fa: item.fa || "-",
+          dano: item.dano || "-",
+          danoTipo: item.danoTipo || "-",
+          alc: item.alc || "-",
+          atq: item.atq || "1"
+        });
+        renderizarArmas();
+        calcularEAtualizarCargaESpeed();
+        if (agenteId) salvarArmasNuvem();
+      } else if (currentModalType === "equipamento") {
+        if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], armas: [], carga: 0, peso: "0 kg" };
+        if (!Array.isArray(agenteAtual.inventario.equipamentos)) agenteAtual.inventario.equipamentos = [];
+        const eqObj = {
+          id: item.id || Date.now(),
+          nome: item.nome,
+          tipo: item.category || item.tipo || item.cat || "Equipamento",
+          categoria: item.category || item.tipo || item.cat || "Equipamento",
+          preco: item.preco != null ? (Number(item.preco) || 0) : 0,
+          peso: typeof item.peso === "number" ? item.peso : (parseFloat(item.peso) || 0),
+          qtd: 1,
+          desc: item.desc || item.descricao || item.efeito || ""
+        };
+        if (item.rd != null && item.rd !== "" && Number(item.rd) > 0) {
+          eqObj.rd = Number(item.rd);
+        }
+        if (item.dano) {
+          eqObj.dano = String(item.dano);
+        }
+        agenteAtual.inventario.equipamentos.push(eqObj);
+        renderizarEquipamentos();
+        calcularEAtualizarCargaESpeed();
+        if (agenteId) salvarEquipamentosNuvem();
+      } else if (currentModalType === "moradia") {
+        if (!agenteAtual.recursos) agenteAtual.recursos = { bens_materiais: [] };
+        if (!Array.isArray(agenteAtual.recursos.bens_materiais)) agenteAtual.recursos.bens_materiais = [];
+        agenteAtual.recursos.bens_materiais.push({
+          id: item.id || Date.now(),
+          nome: item.nome,
+          tipo: "moradia",
+          preco: Number(item.preco) || 0,
+          upgrades: []
+        });
+        renderizarBensMateriais();
+        if (agenteId) salvarBensMateriaisNuvem();
+      } else if (currentModalType === "veiculo") {
+        if (!agenteAtual.recursos) agenteAtual.recursos = { bens_materiais: [] };
+        if (!Array.isArray(agenteAtual.recursos.bens_materiais)) agenteAtual.recursos.bens_materiais = [];
+        const veicObj = {
+          id: item.id || Date.now(),
+          nome: item.nome,
+          tipo: "veiculo",
+          preco: Number(item.preco) || 0,
+          velocidade: item.velocidade || "N/A"
+        };
+        if (item.passageiros) veicObj.passageiros = item.passageiros;
+        agenteAtual.recursos.bens_materiais.push(veicObj);
+        renderizarBensMateriais();
+        if (agenteId) salvarBensMateriaisNuvem();
+      } else if (currentModalType === "habilidade") {
+        if (!agenteAtual.habilidades) agenteAtual.habilidades = { lista: [], rituais: [] };
+        if (!Array.isArray(agenteAtual.habilidades.lista)) agenteAtual.habilidades.lista = [];
+        if (item.categoria === "Banda") {
+          const totalBanda = agenteAtual.habilidades.lista.filter(x => x.categoria === "Banda").length;
+          if (totalBanda >= 2) {
+            return alert("Limite das Regras: Cada personagem pode ter no máximo 2 Habilidades de Banda.");
+          }
+        }
+        agenteAtual.habilidades.lista.push({
+          id: item.id || Date.now(),
+          nome: item.nome,
+          tipo: "habilidade",
+          categoria: item.categoria || "Geral",
+          custo: item.custo || "-",
+          descricao: item.descricao || "",
+          requisito: item.requisito || "-"
+        });
+        renderizarHabilidadesPoderes();
+        calcularEAtualizarCargaESpeed();
+        if (agenteId) {
+          updateDoc(doc(db, "agentes", String(agenteId)), sanitizarParaFirestore({
+            "habilidades.lista": agenteAtual.habilidades.lista
+          })).catch(e => console.error("Erro ao salvar habilidade:", e));
+        }
+      } else if (currentModalType === "poder") {
+        if (!agenteAtual.habilidades) agenteAtual.habilidades = { lista: [], rituais: [] };
+        if (!Array.isArray(agenteAtual.habilidades.lista)) agenteAtual.habilidades.lista = [];
+        agenteAtual.habilidades.push ? null : null;
+        agenteAtual.habilidades.lista.push({
+          id: item.id || Date.now(),
+          nome: item.nome,
+          tipo: "poder",
+          vertente: item.vertente || "Uncanny",
+          custo: item.custo || "-",
+          descricao: item.descricao || "",
+          afinidade: item.afinidade || "",
+          afinidadeAtiva: false
+        });
+        renderizarHabilidadesPoderes();
+        
+        const numPoderes = agenteAtual.habilidades.lista.filter(x => x.tipo === "poder").length;
+        const calculatedGC = 50 + numPoderes * 5;
+        if (!agenteAtual.status) agenteAtual.status = { gc: 50 };
+        agenteAtual.status.gc = calculatedGC;
+        const gcInput = document.getElementById("status-gc");
+        if (gcInput) gcInput.value = calculatedGC;
 
-      if (agenteId) {
-        updateDoc(doc(db, "agentes", String(agenteId)), {
-          "habilidades.lista": agenteAtual.habilidades.lista,
-          "status.gc": calculatedGC
-        }).catch(e => console.error("Erro ao salvar poder e GC:", e));
+        if (agenteId) {
+          updateDoc(doc(db, "agentes", String(agenteId)), sanitizarParaFirestore({
+            "habilidades.lista": agenteAtual.habilidades.lista,
+            "status.gc": calculatedGC
+          })).catch(e => console.error("Erro ao salvar poder e GC:", e));
+        }
+      } else if (currentModalType === "ritual") {
+        if (!agenteAtual.habilidades) agenteAtual.habilidades = { lista: [], rituais: [] };
+        if (!Array.isArray(agenteAtual.habilidades.rituais)) agenteAtual.habilidades.rituais = [];
+        agenteAtual.habilidades.rituais.push({
+          id: item.id || Date.now(),
+          nome: item.nome,
+          circulo: item.circulo || "Básico",
+          aspecto: item.aspecto || "-",
+          custo: item.custo || "-",
+          alc: item.alc || "-",
+          target: item.target || "-",
+          duracao: item.duracao || "-",
+          resistencia: item.resistencia || "-",
+          condicao: item.condicao || "-",
+          desc: item.desc || ""
+        });
+        renderizarRituais();
+        if (agenteId) salvarRituaisNuvem();
       }
-    } else if (currentModalType === "ritual") {
-      if (!agenteAtual.habilidades) agenteAtual.habilidades = { lista: [], rituais: [] };
-      if (!Array.isArray(agenteAtual.habilidades.rituais)) agenteAtual.habilidades.rituais = [];
-      agenteAtual.habilidades.rituais.push({
-        id: item.id || Date.now(),
-        nome: item.nome,
-        circulo: item.circulo || "Básico",
-        aspecto: item.aspecto || "-",
-        custo: item.custo || "-",
-        alc: item.alc || "-",
-        target: item.target || "-",
-        duracao: item.duracao || "-",
-        resistencia: item.resistencia || "-",
-        condicao: item.condicao || "-",
-        desc: item.desc || ""
-      });
-      renderizarRituais();
-      if (agenteId) salvarRituaisNuvem();
+    } catch (err) {
+      console.error("Erro ao adicionar item:", err);
+    } finally {
+      const modal = document.getElementById("regras-selecao-modal");
+      if (modal) modal.classList.add("hidden");
     }
-
-    const modal = document.getElementById("regras-selecao-modal");
-    if (modal) modal.classList.add("hidden");
   }
 
   window.removerTrauma = (index) => {
@@ -2441,10 +2471,17 @@ if (formFicha) {
 
   function salvarArmasNuvem() {
     if (!agenteId) return;
-    updateDoc(doc(db, "agentes", String(agenteId)), {
-      "inventario.armas": agenteAtual.inventario.armas,
-      "inventario.equipamentos": agenteAtual.inventario.equipamentos
-    }).catch(e => console.error("Erro ao salvar armas:", e));
+    try {
+      const payload = sanitizarParaFirestore({
+        "inventario.armas": agenteAtual.inventario.armas,
+        "inventario.equipamentos": agenteAtual.inventario.equipamentos
+      });
+      updateDoc(doc(db, "agentes", String(agenteId)), payload).catch(e =>
+        console.error("Erro ao salvar armas:", e)
+      );
+    } catch (e) {
+      console.error("Erro ao preparar armas para salvar:", e);
+    }
   }
 
   // Handlers para Equipamentos Gerais
@@ -2470,10 +2507,17 @@ if (formFicha) {
 
   function salvarEquipamentosNuvem() {
     if (!agenteId) return;
-    updateDoc(doc(db, "agentes", String(agenteId)), {
-      "inventario.armas": agenteAtual.inventario.armas,
-      "inventario.equipamentos": agenteAtual.inventario.equipamentos
-    }).catch(e => console.error("Erro ao salvar equipamentos:", e));
+    try {
+      const payload = sanitizarParaFirestore({
+        "inventario.armas": agenteAtual.inventario.armas,
+        "inventario.equipamentos": agenteAtual.inventario.equipamentos
+      });
+      updateDoc(doc(db, "agentes", String(agenteId)), payload).catch(e =>
+        console.error("Erro ao salvar equipamentos:", e)
+      );
+    } catch (e) {
+      console.error("Erro ao preparar equipamentos para salvar:", e);
+    }
   }
 
   window.removerBemMaterial = (index) => {
@@ -2504,9 +2548,16 @@ if (formFicha) {
 
   function salvarBensMateriaisNuvem() {
     if (!agenteId) return;
-    updateDoc(doc(db, "agentes", String(agenteId)), {
-      "recursos.bens_materiais": agenteAtual.recursos.bens_materiais
-    }).catch(e => console.error("Erro ao salvar bens materiais:", e));
+    try {
+      const payload = sanitizarParaFirestore({
+        "recursos.bens_materiais": agenteAtual.recursos.bens_materiais
+      });
+      updateDoc(doc(db, "agentes", String(agenteId)), payload).catch(e =>
+        console.error("Erro ao salvar bens materiais:", e)
+      );
+    } catch (e) {
+      console.error("Erro ao preparar bens materiais para salvar:", e);
+    }
   }
 
   window.removerHabilidadePoder = (index) => {
@@ -3264,11 +3315,11 @@ if (formFicha) {
             categoria,
             preco,
             peso,
-            rd: rd > 0 ? rd : undefined,
-            dano: existing?.dano || undefined,
             qtd: existing?.qtd || 1,
             desc
           };
+          if (rd > 0) eqObj.rd = rd;
+          if (existing?.dano) eqObj.dano = existing.dano;
 
           if (isNew) {
             agenteAtual.inventario.equipamentos.push(eqObj);
@@ -3284,7 +3335,7 @@ if (formFicha) {
           if (!nome) return alert("Por favor, preencha o nome do bem material.");
           const tipo = document.getElementById("editor-bem-tipo").value;
           const preco = parseFloat(document.getElementById("editor-bem-preco")?.value) || 0;
-          const velocidade = tipo === "veiculo" ? (document.getElementById("editor-bem-velocidade")?.value.trim() || "N/A") : undefined;
+          const velocidade = tipo === "veiculo" ? (document.getElementById("editor-bem-velocidade")?.value.trim() || "N/A") : null;
 
           if (!agenteAtual.recursos) agenteAtual.recursos = { bens_materiais: [] };
           if (!Array.isArray(agenteAtual.recursos.bens_materiais)) agenteAtual.recursos.bens_materiais = [];
@@ -3294,10 +3345,11 @@ if (formFicha) {
             nome,
             tipo,
             preco,
-            velocidade: velocidade || (existing?.velocidade || undefined),
-            passageiros: existing?.passageiros || undefined,
             upgrades: existing?.upgrades || []
           };
+          if (velocidade) bemObj.velocidade = velocidade;
+          else if (existing?.velocidade) bemObj.velocidade = existing.velocidade;
+          if (existing?.passageiros) bemObj.passageiros = existing.passageiros;
 
           if (isNew) {
             agenteAtual.recursos.bens_materiais.push(bemObj);
@@ -3406,7 +3458,8 @@ if (formFicha) {
       const updates = { ...pendingUpdates };
       pendingUpdates = {}; // limpa para o próximo lote
       try {
-        await updateDoc(doc(db, "agentes", String(agenteId)), updates);
+        const payload = sanitizarParaFirestore(updates);
+        await updateDoc(doc(db, "agentes", String(agenteId)), payload);
       } catch (e) {
         console.error("Erro ao atualizar campo:", e);
         alert(
