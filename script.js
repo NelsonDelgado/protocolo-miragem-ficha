@@ -25,7 +25,7 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-import { REGRAS } from "./regras.js?v=32";
+import { REGRAS } from "./regras.js?v=33";
 
 const firebaseConfig = {
   // Dados de autenticacao firebase
@@ -1612,6 +1612,8 @@ if (formFicha) {
 
       let detailsStr = `Categoria: <strong>${escapeHtml(eq.categoria || eq.tipo || "Geral")}</strong> | Peso: <strong>${eq.peso} kg</strong>`;
       if (eq.preco != null && eq.preco !== "") detailsStr += ` | Preço: <strong>${eq.preco} €</strong>`;
+      if (eq.rd != null && eq.rd !== "" && Number(eq.rd) > 0) detailsStr += ` | RD: <strong>${eq.rd}</strong>`;
+      if (eq.dano) detailsStr += ` | Dano: <strong>${escapeHtml(eq.dano)}</strong>`;
 
       let controlsHtml = `
         <div class="item-card-controls">
@@ -2123,6 +2125,7 @@ if (formFicha) {
       } else if (currentModalType === "equipamento") {
         detailsStr = `Categoria: <strong>${item.category || item.cat || "Geral"}</strong> | Peso: <strong>${item.peso} kg</strong>`;
         if (item.preco != null) detailsStr += ` | Preço: <strong>${item.preco} €</strong>`;
+        if (item.rd != null && item.rd !== "" && Number(item.rd) > 0) detailsStr += ` | RD: <strong>${item.rd}</strong>`;
         if (item.dano) detailsStr += ` | Dano: <strong>${item.dano}</strong>`;
       } else if (currentModalType === "moradia") {
         detailsStr = `Custo: ${item.preco} Créditos`;
@@ -2210,6 +2213,8 @@ if (formFicha) {
         categoria: item.category || item.tipo || item.cat || "Equipamento",
         preco: item.preco != null ? item.preco : 0,
         peso: typeof item.peso === "number" ? item.peso : (parseFloat(item.peso) || 0),
+        rd: item.rd != null ? item.rd : undefined,
+        dano: item.dano || undefined,
         qtd: 1,
         desc: item.desc || item.descricao || item.efeito || ""
       });
@@ -2920,6 +2925,10 @@ if (formFicha) {
           <label for="editor-eq-peso">Peso (kg):</label>
           <input type="number" step="0.1" id="editor-eq-peso" value="${item.peso || 0}" min="0" />
         </div>
+        <div class="item-editor-group">
+          <label for="editor-eq-rd">RD (Proteção):</label>
+          <input type="number" step="1" id="editor-eq-rd" value="${item.rd || 0}" min="0" />
+        </div>
       </div>
       <div class="item-editor-group">
         <label for="editor-eq-desc">Descrição / Efeito:</label>
@@ -3137,6 +3146,7 @@ if (formFicha) {
           const categoria = document.getElementById("editor-eq-categoria").value;
           const preco = parseFloat(document.getElementById("editor-eq-preco")?.value) || 0;
           const peso = parseFloat(document.getElementById("editor-eq-peso").value) || 0;
+          const rd = parseInt(document.getElementById("editor-eq-rd")?.value) || 0;
           const desc = document.getElementById("editor-eq-desc").value.trim();
 
           if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], armas: [], carga: 0, peso: "0 kg" };
@@ -3149,6 +3159,8 @@ if (formFicha) {
             categoria,
             preco,
             peso,
+            rd: rd > 0 ? rd : undefined,
+            dano: existing?.dano || undefined,
             qtd: existing?.qtd || 1,
             desc
           };
