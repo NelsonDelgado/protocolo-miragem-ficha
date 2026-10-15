@@ -497,6 +497,28 @@ function normalizarAgente(agente) {
     return true;
   });
 
+  // 5. Bens Materiais (Moradias e Veículos)
+  if (!combinado.recursos || typeof combinado.recursos !== "object") {
+    combinado.recursos = { poupanca: "", salario: "", bens_materiais: [] };
+  }
+  if (typeof combinado.recursos.bens_materiais === "string") {
+    const raw = combinado.recursos.bens_materiais.trim();
+    if (raw) {
+      const linhas = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      combinado.recursos.bens_materiais = linhas.map((linha, idx) => ({
+        id: Date.now() + idx,
+        nome: linha,
+        tipo: "moradia",
+        preco: 0,
+        upgrades: []
+      }));
+    } else {
+      combinado.recursos.bens_materiais = [];
+    }
+  } else if (!Array.isArray(combinado.recursos.bens_materiais)) {
+    combinado.recursos.bens_materiais = [];
+  }
+
   return combinado;
 }
 
@@ -1657,29 +1679,45 @@ if (formFicha) {
       card.className = "interactive-item-card";
 
       const isMoradia = bem.tipo === "moradia";
-      const detailsStr = isMoradia ? `Moradia | Custo: ${bem.preco || 0} Créditos` : `Veículo | Velocidade: ${bem.velocidade || "N/A"} | Custo: ${bem.preco || 0} Créditos`;
+      let detailsStr = "";
+      if (isMoradia) {
+        detailsStr = `Tipo: <strong>Moradia</strong> | Custo: <strong>${(bem.preco || 0).toLocaleString('pt-PT')} €</strong>`;
+      } else if (bem.tipo === "veiculo") {
+        detailsStr = `Tipo: <strong>Veículo</strong> | Velocidade: <strong>${bem.velocidade || "N/A"}</strong>${bem.passageiros ? ` | Passageiros: <strong>${bem.passageiros}</strong>` : ""} | Custo: <strong>${(bem.preco || 0).toLocaleString('pt-PT')} €</strong>`;
+      } else {
+        detailsStr = `Tipo: <strong>${escapeHtml(bem.tipo || "Bem Material")}</strong> | Custo: <strong>${(bem.preco || 0).toLocaleString('pt-PT')} €</strong>`;
+      }
 
       let upgradesHtml = "";
       if (isMoradia && !isReadOnly) {
-        upgradesHtml = `<div class="item-card-upgrades"><strong>Melhorias de Moradia:</strong><br/>`;
-        REGRAS.melhoriasMoradia.forEach(mel => {
+        upgradesHtml = `
+          <div class="item-card-upgrades" style="margin-top: 6px; padding-top: 4px; border-top: 1px dashed rgba(128,128,128,0.2); font-size: 11px;">
+            <div style="font-weight: bold; margin-bottom: 4px;">Melhorias de Moradia:</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        `;
+        (REGRAS.melhoriasMoradia || []).forEach(mel => {
           const checked = Array.isArray(bem.upgrades) && bem.upgrades.includes(mel.nome) ? "checked" : "";
           upgradesHtml += `
-            <label style="margin-right: 8px; display: inline-block;">
-              <input type="checkbox" ${checked} onchange="window.toggleMoradiaUpgrade(${index}, '${mel.nome}', this.checked)" />
-              ${mel.nome} (${mel.preco}¢)
+            <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; cursor: pointer;">
+              <input type="checkbox" ${checked} onchange="window.toggleMoradiaUpgrade(${index}, '${escapeHtml(mel.nome)}', this.checked)" />
+              ${escapeHtml(mel.nome)} (${mel.preco}€)
             </label>
           `;
         });
-        upgradesHtml += `</div>`;
+        upgradesHtml += `</div></div>`;
       } else if (isMoradia && Array.isArray(bem.upgrades) && bem.upgrades.length > 0) {
-        upgradesHtml = `<div class="item-card-upgrades"><strong>Melhorias:</strong> ${bem.upgrades.join(", ")}</div>`;
+        upgradesHtml = `<div class="item-card-upgrades" style="margin-top: 4px; font-size: 11px;"><strong>Melhorias:</strong> ${bem.upgrades.map(u => escapeHtml(u)).join(", ")}</div>`;
       }
 
       card.innerHTML = `
         <div class="item-card-header">
-          <span class="item-card-title">${bem.nome}</span>
-          ${isReadOnly ? "" : `<button type="button" class="item-card-remove" onclick="window.removerBemMaterial(${index})">Remover</button>`}
+          <span class="item-card-title">${escapeHtml(bem.nome)}</span>
+          ${isReadOnly ? "" : `
+            <div class="item-card-actions">
+              <button type="button" class="item-card-edit" onclick="window.editarBemMaterial(${index})">Editar</button>
+              <button type="button" class="item-card-remove" onclick="window.removerBemMaterial(${index})">Remover</button>
+            </div>
+          `}
         </div>
         <div class="item-card-details">${detailsStr}</div>
         ${upgradesHtml}
@@ -1910,7 +1948,7 @@ if (formFicha) {
 
     const btnCustom = document.getElementById("modal-selecao-btn-custom");
     if (btnCustom) {
-      if (["fobia", "mania", "ferimento", "maldicao", "habilidade", "poder", "ritual", "arma", "equipamento"].includes(tipo)) {
+      if (["fobia", "mania", "ferimento", "maldicao", "habilidade", "poder", "ritual", "arma", "equipamento", "moradia", "veiculo"].includes(tipo)) {
         btnCustom.style.display = "flex";
         btnCustom.textContent = tipo === "ritual"
           ? "+ Criar Ritual Próprio"
@@ -1924,7 +1962,11 @@ if (formFicha) {
                   ? "+ Criar Arma Própria"
                   : (tipo === "equipamento"
                     ? "+ Criar Equipamento Próprio"
-                    : "+ Criar Próprio")))));
+                    : (tipo === "moradia"
+                      ? "+ Criar Moradia Própria"
+                      : (tipo === "veiculo"
+                        ? "+ Criar Veículo Próprio"
+                        : "+ Criar Próprio")))))));
         btnCustom.onclick = () => {
           modal.classList.add("hidden");
           if (tipo === "fobia" || tipo === "mania" || tipo === "ferimento" || tipo === "maldicao") {
@@ -1937,6 +1979,8 @@ if (formFicha) {
             abrirEditorArma(-1);
           } else if (tipo === "equipamento") {
             abrirEditorEquipamento(-1);
+          } else if (tipo === "moradia" || tipo === "veiculo") {
+            abrirEditorBemMaterial(-1, tipo);
           }
         };
       } else {
@@ -2128,9 +2172,9 @@ if (formFicha) {
         if (item.rd != null && item.rd !== "" && Number(item.rd) > 0) detailsStr += ` | RD: <strong>${item.rd}</strong>`;
         if (item.dano) detailsStr += ` | Dano: <strong>${item.dano}</strong>`;
       } else if (currentModalType === "moradia") {
-        detailsStr = `Custo: ${item.preco} Créditos`;
+        detailsStr = `Tipo: <strong>Moradia</strong> | Custo: <strong>${(item.preco || 0).toLocaleString('pt-PT')} €</strong>`;
       } else if (currentModalType === "veiculo") {
-        detailsStr = `Tipo: ${item.tipo} | Velocidade: ${item.velocidade} | Custo: ${item.preco} Créditos`;
+        detailsStr = `Tipo: <strong>${escapeHtml(item.tipo || "Veículo")}</strong> | Velocidade: <strong>${item.velocidade || "N/A"}</strong>${item.passageiros ? ` | Passageiros: <strong>${item.passageiros}</strong>` : ""} | Custo: <strong>${(item.preco || 0).toLocaleString('pt-PT')} €</strong>`;
       } else if (item.detalhes) {
         detailsStr = item.detalhes;
       }
@@ -2437,6 +2481,10 @@ if (formFicha) {
     agenteAtual.recursos.bens_materiais.splice(index, 1);
     renderizarBensMateriais();
     salvarBensMateriaisNuvem();
+  };
+
+  window.editarBemMaterial = (index) => {
+    abrirEditorBemMaterial(index);
   };
 
   window.toggleMoradiaUpgrade = (index, melNome, isChecked) => {
@@ -2939,6 +2987,63 @@ if (formFicha) {
     modal.classList.remove("hidden");
   }
 
+  function abrirEditorBemMaterial(index, defaultTipo = "moradia") {
+    const isNew = index < 0;
+    const item = !isNew && agenteAtual?.recursos?.bens_materiais?.[index]
+      ? agenteAtual.recursos.bens_materiais[index]
+      : { nome: "", tipo: defaultTipo, preco: 0, velocidade: defaultTipo === "veiculo" ? "120 km/h" : "" };
+
+    editingItemState = { category: "bem_material", index, isNew };
+
+    const modal = document.getElementById("item-editor-modal");
+    const title = document.getElementById("item-editor-title");
+    const fields = document.getElementById("item-editor-fields");
+    if (!modal || !fields) return;
+
+    if (title) {
+      title.textContent = isNew
+        ? (item.tipo === "veiculo" ? "Adicionar Veículo Próprio" : "Adicionar Moradia Própria")
+        : (item.tipo === "veiculo" ? "Editar Veículo" : "Editar Moradia / Bem Material");
+    }
+
+    const currentTipo = item.tipo || defaultTipo || "moradia";
+
+    fields.innerHTML = `
+      <div class="item-editor-group">
+        <label for="editor-bem-nome">Nome do Bem Material:</label>
+        <input type="text" id="editor-bem-nome" value="${escapeHtml(item.nome || "")}" placeholder="Ex: Apartamento em Lisboa, Moto Esportiva..." required />
+      </div>
+      <div class="item-editor-row">
+        <div class="item-editor-group">
+          <label for="editor-bem-tipo">Tipo:</label>
+          <select id="editor-bem-tipo">
+            <option value="moradia" ${currentTipo === "moradia" ? "selected" : ""}>Moradia</option>
+            <option value="veiculo" ${currentTipo === "veiculo" ? "selected" : ""}>Veículo</option>
+            <option value="outro" ${currentTipo === "outro" ? "selected" : ""}>Outro</option>
+          </select>
+        </div>
+        <div class="item-editor-group">
+          <label for="editor-bem-preco">Preço (€):</label>
+          <input type="number" step="100" id="editor-bem-preco" value="${item.preco != null ? item.preco : 0}" min="0" />
+        </div>
+        <div class="item-editor-group" id="editor-bem-vel-group" style="${currentTipo === 'veiculo' ? '' : 'display: none;'}">
+          <label for="editor-bem-velocidade">Velocidade:</label>
+          <input type="text" id="editor-bem-velocidade" value="${escapeHtml(item.velocidade || '')}" placeholder="Ex: 140 km/h" />
+        </div>
+      </div>
+    `;
+
+    const tipoSelect = document.getElementById("editor-bem-tipo");
+    const velGroup = document.getElementById("editor-bem-vel-group");
+    if (tipoSelect && velGroup) {
+      tipoSelect.onchange = () => {
+        velGroup.style.display = tipoSelect.value === "veiculo" ? "block" : "none";
+      };
+    }
+
+    modal.classList.remove("hidden");
+  }
+
   const setupItemEditor = () => {
     const modal = document.getElementById("item-editor-modal");
     const closeBtn = document.getElementById("item-editor-close");
@@ -3174,6 +3279,34 @@ if (formFicha) {
           renderizarEquipamentos();
           calcularEAtualizarCargaESpeed();
           salvarEquipamentosNuvem();
+        } else if (category === "bem_material") {
+          const nome = document.getElementById("editor-bem-nome").value.trim();
+          if (!nome) return alert("Por favor, preencha o nome do bem material.");
+          const tipo = document.getElementById("editor-bem-tipo").value;
+          const preco = parseFloat(document.getElementById("editor-bem-preco")?.value) || 0;
+          const velocidade = tipo === "veiculo" ? (document.getElementById("editor-bem-velocidade")?.value.trim() || "N/A") : undefined;
+
+          if (!agenteAtual.recursos) agenteAtual.recursos = { bens_materiais: [] };
+          if (!Array.isArray(agenteAtual.recursos.bens_materiais)) agenteAtual.recursos.bens_materiais = [];
+          const existing = !isNew ? agenteAtual.recursos.bens_materiais[index] : null;
+          const bemObj = {
+            id: isNew ? Date.now() : (existing?.id || Date.now()),
+            nome,
+            tipo,
+            preco,
+            velocidade: velocidade || (existing?.velocidade || undefined),
+            passageiros: existing?.passageiros || undefined,
+            upgrades: existing?.upgrades || []
+          };
+
+          if (isNew) {
+            agenteAtual.recursos.bens_materiais.push(bemObj);
+          } else {
+            agenteAtual.recursos.bens_materiais[index] = bemObj;
+          }
+
+          renderizarBensMateriais();
+          salvarBensMateriaisNuvem();
         }
 
         fecharModalEditor();
@@ -3195,6 +3328,8 @@ if (formFicha) {
 
     const addArma = document.getElementById("btn-add-arma");
     const addEquipamento = document.getElementById("btn-add-equipamento");
+    const addMoradia = document.getElementById("btn-add-moradia");
+    const addVeiculo = document.getElementById("btn-add-veiculo");
 
     if (addFobia) addFobia.onclick = () => abrirModalSelecao("fobia");
     if (addMania) addMania.onclick = () => abrirModalSelecao("mania");
@@ -3208,6 +3343,8 @@ if (formFicha) {
 
     if (addArma) addArma.onclick = () => abrirModalSelecao("arma");
     if (addEquipamento) addEquipamento.onclick = () => abrirModalSelecao("equipamento");
+    if (addMoradia) addMoradia.onclick = () => abrirModalSelecao("moradia");
+    if (addVeiculo) addVeiculo.onclick = () => abrirModalSelecao("veiculo");
 
     // Lógica para fechar o modal de seleção de regras
     const modalSelecao = document.getElementById("regras-selecao-modal");

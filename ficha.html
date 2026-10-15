@@ -1481,7 +1481,11 @@
             </div>
             <div class="boxed-area goods-box">
               <span>BENS MATERIAIS</span>
-              <textarea id="recursos-bens_materiais" rows="10"></textarea>
+              <div id="recursos-bens_materiais-lista" class="interactive-container"></div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <button type="button" id="btn-add-moradia" class="interactive-add-btn" style="margin-top:0;">+ Moradia</button>
+                <button type="button" id="btn-add-veiculo" class="interactive-add-btn" style="margin-top:0;">+ Veículo</button>
+              </div>
             </div>
             <div class="load-matrix">
               <label
@@ -1680,6 +1684,6 @@
       </div>
     </div>
 
-    <script type="module" src="script.js?v=48"></script>
+    <script type="module" src="script.js?v=49"></script>
   </body>
 </html>
