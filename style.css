@@ -855,11 +855,21 @@ input[type="number"]::-webkit-outer-spin-button {
   text-transform: uppercase;
 }
 
-.resource-line input,
+.resource-line input {
+  height: 100%;
+  border: 0;
+}
+
 .combat-strip input,
 .combat-strip textarea {
   height: 100%;
   border: 0;
+  text-align: center;
+  font-weight: 800;
+  font-size: 16px;
+  background: transparent;
+  color: var(--ink);
+  width: 100%;
 }
 
 .equipment-box {
@@ -1814,6 +1824,11 @@ body.dark-theme .carga-deslocamento-tag {
 
 body.dark-theme .combat-strip {
   background: rgba(30, 30, 30, 0.7);
+}
+
+body.dark-theme .combat-strip input,
+body.dark-theme .combat-strip textarea {
+  color: #fbfbf8;
 }
 
 body.dark-theme .attribute-web {

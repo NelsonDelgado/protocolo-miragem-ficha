@@ -1518,7 +1518,7 @@ if (formFicha) {
     const deslocamentoTextEl = document.getElementById("carga-deslocamento-text");
 
     if (badgeEl && penalidadeTextEl && deslocamentoTextEl) {
-      let baseSpeed = 9.0;
+      let baseSpeed = 6.0;
       const modFerimentos = calcularModificadorDeslocamento(agenteAtual.perfil?.traumas);
       let speedCalculado = Math.max(0, baseSpeed + modFerimentos);
 
@@ -1558,6 +1558,15 @@ if (formFicha) {
   function atualizarCalculosAutomaticos(salvarNuvem = true) {
     if (!agenteAtual) return;
 
+    const deveSalvarNuvem = salvarNuvem || (
+      agenteId && (
+        agenteAtual.combate?.defesa === undefined ||
+        agenteAtual.combate?.rd === undefined ||
+        agenteAtual.combate?.db === undefined ||
+        !agenteAtual.status?.pv_max
+      )
+    );
+
     // 1. PV Máximo: (Vigor + Corpo) / 5 (Regra Oficial pág. 32)
     const vig = parseInt(agenteAtual.atributos?.vigor) || 0;
     const cor = parseInt(agenteAtual.atributos?.corpo) || 0;
@@ -1574,9 +1583,9 @@ if (formFicha) {
     if (pvEl && (agenteAtual.status.pv === undefined || agenteAtual.status.pv === null || agenteAtual.status.pv === "")) {
       pvEl.value = pvMaxCalculado;
       agenteAtual.status.pv = pvMaxCalculado;
-      if (salvarNuvem) atualizarCampoDebounced("status", "pv", pvMaxCalculado);
+      if (deveSalvarNuvem) atualizarCampoDebounced("status", "pv", pvMaxCalculado);
     }
-    if (salvarNuvem) {
+    if (deveSalvarNuvem) {
       atualizarCampoDebounced("status", "pv_max", pvMaxCalculado);
     }
 
@@ -1596,9 +1605,9 @@ if (formFicha) {
     if (dbEl && dbEl.value !== dbCalculado) {
       dbEl.value = dbCalculado;
     }
-    if (!agenteAtual.combate) agenteAtual.combate = { rd: "", defesa: "", db: "" };
+    if (!agenteAtual.combate) agenteAtual.combate = { rd: 0, defesa: 0, db: "0" };
     agenteAtual.combate.db = dbCalculado;
-    if (salvarNuvem) {
+    if (deveSalvarNuvem) {
       atualizarCampoDebounced("combate", "db", dbCalculado);
     }
 
@@ -1615,14 +1624,29 @@ if (formFicha) {
     if (defesaEl && String(defesaEl.value) !== String(defesaCalculada)) {
       defesaEl.value = defesaCalculada;
     }
-    if (!agenteAtual.combate) agenteAtual.combate = { rd: "", defesa: "", db: "" };
     agenteAtual.combate.defesa = defesaCalculada;
-    if (salvarNuvem) {
+    if (deveSalvarNuvem) {
       atualizarCampoDebounced("combate", "defesa", defesaCalculada);
     }
 
-    // 4. Limites de Carga e Penalidades de Deslocamento
-    calcularEAtualizarCargaESpeed(salvarNuvem);
+    // 4. Redução de Dano (RD): Soma de RD das vestimentas e proteções do inventário
+    let rdCalculado = 0;
+    eqs.forEach(eq => {
+      if (eq.rd != null && eq.rd !== "") {
+        rdCalculado += Number(eq.rd) || 0;
+      }
+    });
+    const rdEl = document.getElementById("combate-rd");
+    if (rdEl && String(rdEl.value) !== String(rdCalculado)) {
+      rdEl.value = rdCalculado;
+    }
+    agenteAtual.combate.rd = rdCalculado;
+    if (deveSalvarNuvem) {
+      atualizarCampoDebounced("combate", "rd", rdCalculado);
+    }
+
+    // 5. Limites de Carga e Penalidades de Deslocamento
+    calcularEAtualizarCargaESpeed(deveSalvarNuvem);
   }
 
   function renderizarTraumas() {
@@ -2451,7 +2475,7 @@ if (formFicha) {
         }
         agenteAtual.inventario.equipamentos.push(eqObj);
         renderizarEquipamentos();
-        calcularEAtualizarCargaESpeed();
+        atualizarCalculosAutomaticos(true);
         if (agenteId) salvarEquipamentosNuvem();
       } else if (currentModalType === "moradia") {
         if (!agenteAtual.recursos) agenteAtual.recursos = { bens_materiais: [] };
@@ -3494,7 +3518,7 @@ if (formFicha) {
           }
 
           renderizarEquipamentos();
-          calcularEAtualizarCargaESpeed();
+          atualizarCalculosAutomaticos(true);
           salvarEquipamentosNuvem();
         } else if (category === "bem_material") {
           const nome = document.getElementById("editor-bem-nome").value.trim();
