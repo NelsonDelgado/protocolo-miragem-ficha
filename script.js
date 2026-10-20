@@ -1441,10 +1441,27 @@ if (formFicha) {
 
   function calcularEAtualizarCargaESpeed(salvarNuvem = false) {
     if (!agenteAtual) return;
-    const forValue = parseInt(agenteAtual.atributos?.forca) || 0;
-    const cargaLeve = forValue / 4;
-    const cargaMod = forValue / 2;
-    const cargaMax = forValue;
+    
+    // Capacidade de Carga: calculada a partir de Corpo (ou Força como alternativa caso Corpo não esteja definido)
+    const corpoVal = parseInt(agenteAtual.atributos?.corpo);
+    const forVal = parseInt(agenteAtual.atributos?.forca);
+    let valorBaseCarga = (!isNaN(corpoVal) && corpoVal > 0) ? corpoVal : ((!isNaN(forVal) && forVal > 0) ? forVal : 0);
+
+    // Habilidade "Inventário Otimizado": usa Intelecto no lugar do atributo físico para calcular capacidade de carga
+    const temInventarioOtimizado = Array.isArray(agenteAtual.habilidades?.lista) &&
+      agenteAtual.habilidades.lista.some(h => h.id === "inventario_otimizado" || (h.nome && h.nome.toLowerCase().includes("inventário otimizado")));
+    if (temInventarioOtimizado) {
+      valorBaseCarga = parseInt(agenteAtual.atributos?.inteligencia) || 0;
+    }
+
+    // Habilidade "Mochileiro": aumenta o limite de carga em +5 kg
+    const temMochileiro = Array.isArray(agenteAtual.habilidades?.lista) &&
+      agenteAtual.habilidades.lista.some(h => h.id === "mochileiro" || (h.nome && h.nome.toLowerCase().includes("mochileiro")));
+    const bonusCarga = temMochileiro ? 5 : 0;
+
+    const cargaLeve = (valorBaseCarga / 4) + bonusCarga;
+    const cargaMod = (valorBaseCarga / 2) + bonusCarga;
+    const cargaMax = valorBaseCarga + bonusCarga;
 
     const cargaLeveEl = document.getElementById("recursos-carga_leve");
     const cargaModEl = document.getElementById("recursos-carga_moderada");
@@ -1524,7 +1541,7 @@ if (formFicha) {
 
       badgeEl.className = "carga-badge";
 
-      if (forValue === 0 && pesoTotal === 0) {
+      if (valorBaseCarga === 0 && pesoTotal === 0) {
         badgeEl.classList.add("carga-leve");
         badgeEl.textContent = "CARGA LEVE";
         penalidadeTextEl.textContent = "Sem penalidades.";
@@ -3686,7 +3703,8 @@ if (formFicha) {
     const periciaInputs = formFicha.querySelectorAll(".linha-pericia input[type='number']:not(.input-base-fixa)");
     periciaInputs.forEach((input) => {
       const val = parseInt(input.value, 10) || 0;
-      const div5Span = input.nextElementSibling;
+      const row = input.closest(".linha-pericia");
+      const div5Span = row ? row.querySelector(".pericia-div5") : input.nextElementSibling;
       if (div5Span && div5Span.classList.contains("pericia-div5")) {
         div5Span.textContent = `(${Math.floor(val / 5)})`;
       }
