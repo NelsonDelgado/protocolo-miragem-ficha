@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ficha do Agente - Protocolo Miragem</title>
-    <link rel="stylesheet" href="style.css?v=28" />
+    <link rel="stylesheet" href="style.css?v=29" />
   </head>
   <body class="ficha-body">
     <!-- Botão Flutuante de Modo Escuro Minimalista -->
@@ -1490,19 +1490,26 @@
             <div class="load-matrix">
               <label
                 ><span>CARGA LEVE:</span
-                ><input type="text" id="recursos-carga_leve"
+                ><input type="text" id="recursos-carga_leve" readonly
               /></label>
               <label
                 ><span>CARGA MODERADA:</span
-                ><input type="text" id="recursos-carga_moderada"
+                ><input type="text" id="recursos-carga_moderada" readonly
               /></label>
               <label
                 ><span>CARGA MÁXIMA:</span
-                ><input type="text" id="recursos-carga_maxima"
+                ><input type="text" id="recursos-carga_maxima" readonly
               /></label>
               <label
-                ><span>PESO TOTAL:</span><input type="text" id="inventario-peso"
+                ><span>PESO TOTAL:</span><input type="text" id="inventario-peso" readonly
               /></label>
+            </div>
+            <div id="carga-penalidade-panel" class="carga-penalidade-panel">
+              <div class="carga-badge carga-leve" id="carga-status-badge">CARGA LEVE</div>
+              <div class="carga-detalhes">
+                <span id="carga-penalidade-text">Sem penalidades de movimento.</span>
+                <span id="carga-deslocamento-text" class="carga-deslocamento-tag">Deslocamento: 9.0m</span>
+              </div>
             </div>
           </div>
 
@@ -1684,6 +1691,6 @@
       </div>
     </div>
 
-    <script type="module" src="script.js?v=51"></script>
+    <script type="module" src="script.js?v=52"></script>
   </body>
 </html>

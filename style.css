@@ -918,6 +918,72 @@ input[type="number"]::-webkit-outer-spin-button {
   font-weight: 800;
 }
 
+.carga-penalidade-panel {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.45);
+  font-family: Georgia, serif;
+  font-size: 11px;
+  gap: 10px;
+}
+
+.carga-badge {
+  font-weight: bold;
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  font-family: sans-serif;
+}
+
+.carga-badge.carga-leve {
+  background: rgba(46, 125, 50, 0.15);
+  color: #2e7d32;
+  border: 1px solid rgba(46, 125, 50, 0.3);
+}
+
+.carga-badge.carga-moderada {
+  background: rgba(245, 124, 0, 0.15);
+  color: #e65100;
+  border: 1px solid rgba(245, 124, 0, 0.3);
+}
+
+.carga-badge.carga-maxima {
+  background: rgba(211, 47, 47, 0.15);
+  color: #c62828;
+  border: 1px solid rgba(211, 47, 47, 0.3);
+}
+
+.carga-badge.carga-sobrecarga {
+  background: #d32f2f;
+  color: #fff;
+  border: 1px solid #b71c1c;
+}
+
+.carga-detalhes {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.carga-deslocamento-tag {
+  font-weight: bold;
+  padding: 2px 7px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
+}
+
 .page-four {
   display: grid;
   grid-template-rows: auto auto 1fr auto auto;
@@ -1715,6 +1781,35 @@ body.dark-theme .input-base-fixa {
 
 body.dark-theme .load-matrix {
   background: rgba(30, 30, 30, 0.6);
+}
+
+body.dark-theme .carga-penalidade-panel {
+  background: rgba(22, 22, 22, 0.6);
+  border-color: var(--line);
+}
+
+body.dark-theme .carga-badge.carga-leve {
+  background: rgba(76, 175, 80, 0.2);
+  color: #81c784;
+  border-color: rgba(76, 175, 80, 0.4);
+}
+
+body.dark-theme .carga-badge.carga-moderada {
+  background: rgba(255, 167, 38, 0.2);
+  color: #ffb74d;
+  border-color: rgba(255, 167, 38, 0.4);
+}
+
+body.dark-theme .carga-badge.carga-maxima {
+  background: rgba(239, 83, 80, 0.2);
+  color: #e57373;
+  border-color: rgba(239, 83, 80, 0.4);
+}
+
+body.dark-theme .carga-deslocamento-tag {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #fbfbf8;
 }
 
 body.dark-theme .combat-strip {
