@@ -1638,6 +1638,13 @@ if (formFicha) {
   function renderizarEquipamentos() {
     const container = document.getElementById("inventario-equipamentos-lista");
     if (!container) return;
+
+    // Preservar estado aberto das gavetas de descrição
+    const openIndexes = new Set();
+    container.querySelectorAll(".interactive-item-card").forEach((c, i) => {
+      if (c.querySelector("details")?.open) openIndexes.add(i);
+    });
+
     container.innerHTML = "";
 
     const equipamentos = Array.isArray(agenteAtual?.inventario?.equipamentos) ? agenteAtual.inventario.equipamentos : [];
@@ -1663,6 +1670,14 @@ if (formFicha) {
         </div>
       `;
 
+      const hasDesc = !!(eq.desc || eq.descricao);
+      const descHtml = hasDesc ? `
+        <details class="item-card-collapse" ${openIndexes.has(index) ? "open" : ""}>
+          <summary>Ver Descrição ▾</summary>
+          <div class="item-card-collapse-content">${escapeHtml(eq.desc || eq.descricao)}</div>
+        </details>
+      ` : "";
+
       card.innerHTML = `
         <div class="item-card-header">
           <span class="item-card-title">${escapeHtml(eq.nome)}</span>
@@ -1674,7 +1689,7 @@ if (formFicha) {
           `}
         </div>
         <div class="item-card-details">${detailsStr}</div>
-        ${eq.desc || eq.descricao ? `<div class="item-card-desc" style="font-size: 11px; margin-top: 3px;">${escapeHtml(eq.desc || eq.descricao)}</div>` : ""}
+        ${descHtml}
         ${controlsHtml}
       `;
       container.appendChild(card);
@@ -1684,6 +1699,13 @@ if (formFicha) {
   function renderizarBensMateriais() {
     const container = document.getElementById("recursos-bens_materiais-lista");
     if (!container) return;
+
+    // Preservar estado aberto das gavetas de melhorias
+    const openIndexes = new Set();
+    container.querySelectorAll(".interactive-item-card").forEach((c, i) => {
+      if (c.querySelector("details")?.open) openIndexes.add(i);
+    });
+
     container.innerHTML = "";
 
     const bens = Array.isArray(agenteAtual?.recursos?.bens_materiais) ? agenteAtual.recursos.bens_materiais : [];
@@ -1708,23 +1730,34 @@ if (formFicha) {
 
       let upgradesHtml = "";
       if (isMoradia && !isReadOnly) {
+        const activeUpgrades = Array.isArray(bem.upgrades) ? bem.upgrades : [];
+        const summaryText = activeUpgrades.length > 0
+          ? `⚙️ Melhorias (${activeUpgrades.length}/6): ${escapeHtml(activeUpgrades.join(", "))} ▾`
+          : `⚙️ Adicionar Melhorias (0 ativas) ▾`;
+
         upgradesHtml = `
-          <div class="item-card-upgrades" style="margin-top: 6px; padding-top: 4px; border-top: 1px dashed rgba(128,128,128,0.2); font-size: 11px;">
-            <div style="font-weight: bold; margin-bottom: 4px;">Melhorias de Moradia:</div>
-            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+          <details class="item-card-collapse" ${openIndexes.has(index) ? "open" : ""}>
+            <summary>${summaryText}</summary>
+            <div class="item-card-collapse-content" style="margin-top: 4px;">
+              <div style="font-weight: bold; margin-bottom: 6px; font-size: 10.5px;">Melhorias da Moradia:</div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
         `;
         (REGRAS.melhoriasMoradia || []).forEach(mel => {
-          const checked = Array.isArray(bem.upgrades) && bem.upgrades.includes(mel.nome) ? "checked" : "";
+          const checked = activeUpgrades.includes(mel.nome) ? "checked" : "";
           upgradesHtml += `
             <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; cursor: pointer;">
               <input type="checkbox" ${checked} onchange="window.toggleMoradiaUpgrade(${index}, '${escapeHtml(mel.nome)}', this.checked)" />
-              ${escapeHtml(mel.nome)} (${mel.preco}€)
+              <span>${escapeHtml(mel.nome)} <small style="color: var(--muted, #888);">(${mel.preco}€)</small></span>
             </label>
           `;
         });
-        upgradesHtml += `</div></div>`;
+        upgradesHtml += `</div></div></details>`;
       } else if (isMoradia && Array.isArray(bem.upgrades) && bem.upgrades.length > 0) {
-        upgradesHtml = `<div class="item-card-upgrades" style="margin-top: 4px; font-size: 11px;"><strong>Melhorias:</strong> ${bem.upgrades.map(u => escapeHtml(u)).join(", ")}</div>`;
+        upgradesHtml = `
+          <div class="item-card-upgrades" style="margin-top: 4px; font-size: 11px;">
+            <strong>Melhorias:</strong> ${bem.upgrades.map(u => `<span class="item-card-upgrade-tag">${escapeHtml(u)}</span>`).join("")}
+          </div>
+        `;
       }
 
       card.innerHTML = `
