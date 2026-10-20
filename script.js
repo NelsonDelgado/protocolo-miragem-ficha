@@ -1527,29 +1527,29 @@ if (formFicha) {
       if (forValue === 0 && pesoTotal === 0) {
         badgeEl.classList.add("carga-leve");
         badgeEl.textContent = "CARGA LEVE";
-        penalidadeTextEl.textContent = "Sem penalidades de movimento.";
+        penalidadeTextEl.textContent = "Sem penalidades.";
         deslocamentoTextEl.textContent = `Deslocamento: ${speedCalculado.toFixed(1)}m`;
       } else if (pesoTotal <= cargaLeve) {
         badgeEl.classList.add("carga-leve");
         badgeEl.textContent = "CARGA LEVE";
-        penalidadeTextEl.textContent = "Sem penalidades de movimento.";
+        penalidadeTextEl.textContent = "Sem penalidades.";
         deslocamentoTextEl.textContent = `Deslocamento: ${speedCalculado.toFixed(1)}m`;
       } else if (pesoTotal <= cargaMod) {
         badgeEl.classList.add("carga-moderada");
         badgeEl.textContent = "CARGA MODERADA";
-        penalidadeTextEl.textContent = "Penalidade: Movimento reduzido à metade (Deslocamento / 2).";
+        penalidadeTextEl.textContent = "Deslocamento reduzido pela metade.";
         speedCalculado = speedCalculado / 2;
         deslocamentoTextEl.textContent = `Deslocamento: ${speedCalculado.toFixed(1)}m`;
       } else if (pesoTotal <= cargaMax) {
         badgeEl.classList.add("carga-maxima");
         badgeEl.textContent = "CARGA MÁXIMA";
-        penalidadeTextEl.textContent = "Penalidade: Movimento / 2 + penalidade de +2 em testes Físicos.";
+        penalidadeTextEl.textContent = "+2 de penalidade em testes Físicos e metade do movimento.";
         speedCalculado = speedCalculado / 2;
         deslocamentoTextEl.textContent = `Deslocamento: ${speedCalculado.toFixed(1)}m`;
       } else {
         badgeEl.classList.add("carga-sobrecarga");
         badgeEl.textContent = "SOBRECARGA";
-        penalidadeTextEl.textContent = "Limite máximo ultrapassado! Deslocamento reduzido a 0m.";
+        penalidadeTextEl.textContent = "Limite excedido! Personagem incapaz de se mover (0m).";
         deslocamentoTextEl.textContent = "Deslocamento: 0.0m";
       }
     }
