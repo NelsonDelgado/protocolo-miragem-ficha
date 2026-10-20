@@ -1563,7 +1563,8 @@ if (formFicha) {
         agenteAtual.combate?.defesa === undefined ||
         agenteAtual.combate?.rd === undefined ||
         agenteAtual.combate?.db === undefined ||
-        !agenteAtual.status?.pv_max
+        !agenteAtual.status?.pv_max ||
+        !agenteAtual.status?.pd_max
       )
     );
 
@@ -1589,7 +1590,29 @@ if (formFicha) {
       atualizarCampoDebounced("status", "pv_max", pvMaxCalculado);
     }
 
-    // 2. Dano Bônus (DB): Força + Corpo (Regra Oficial pág. 32)
+    // 2. PD Máximo: ((Inteligência + Sabedoria) / 5) + Humanidade Inicial (Regra Oficial pág. 32)
+    const int = parseInt(agenteAtual.atributos?.inteligencia) || 0;
+    const sab = parseInt(agenteAtual.atributos?.sabedoria) || 0;
+    const hum = parseInt(agenteAtual.atributos?.humanidade) || 0;
+    const pdMaxCalculado = Math.floor((int + sab) / 5) + hum;
+    const pdMaxEl = document.getElementById("status-pd_max");
+    if (pdMaxEl && String(pdMaxEl.value) !== String(pdMaxCalculado)) {
+      pdMaxEl.value = pdMaxCalculado;
+    }
+    agenteAtual.status.pd_max = pdMaxCalculado;
+
+    // Se PD atual estiver vazio ou indefinido, inicializa com o PD Máximo
+    const pdEl = document.getElementById("status-pd");
+    if (pdEl && (agenteAtual.status.pd === undefined || agenteAtual.status.pd === null || agenteAtual.status.pd === "")) {
+      pdEl.value = pdMaxCalculado;
+      agenteAtual.status.pd = pdMaxCalculado;
+      if (deveSalvarNuvem) atualizarCampoDebounced("status", "pd", pdMaxCalculado);
+    }
+    if (deveSalvarNuvem) {
+      atualizarCampoDebounced("status", "pd_max", pdMaxCalculado);
+    }
+
+    // 3. Dano Bônus (DB): Força + Corpo (Regra Oficial pág. 32)
     const forca = parseInt(agenteAtual.atributos?.forca) || 0;
     const somaForCor = forca + cor;
     let dbCalculado = "0";
