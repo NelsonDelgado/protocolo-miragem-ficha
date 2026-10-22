@@ -1842,61 +1842,79 @@ if (formFicha) {
     // 1. PV Máximo: (Vigor + Corpo) / 5 (Regra Oficial pág. 32)
     const vig = parseInt(agenteAtual.atributos?.vigor) || 0;
     const cor = parseInt(agenteAtual.atributos?.corpo) || 0;
-    const pvMaxCalculado = Math.floor((vig + cor) / 5);
+    const pvMaxBase = Math.floor((vig + cor) / 5);
     const pvMaxEl = document.getElementById("status-pv_max");
 
     if (!agenteAtual.status) agenteAtual.status = {};
+
+    // Delta Inteligente para PV:
+    let pvMod = 0;
+    if (agenteAtual.status.pv_max_mod !== undefined && agenteAtual.status.pv_max_mod !== null) {
+      pvMod = Number(agenteAtual.status.pv_max_mod) || 0;
+    } else if (agenteAtual.status.pv_max && Number(agenteAtual.status.pv_max) > 0) {
+      // Se já existia um pv_max salvo, calcula o delta inicial em relação à base
+      pvMod = Number(agenteAtual.status.pv_max) - pvMaxBase;
+      agenteAtual.status.pv_max_mod = pvMod;
+    }
+    const pvTotal = Math.max(1, pvMaxBase + pvMod);
+    agenteAtual.status.pv_max = pvTotal;
+
     if (pvMaxEl) {
-      pvMaxEl.title = `PV Máximo (Base pelos atributos: ${pvMaxCalculado}. Editável manualmente)`;
-      // Se não houver valor salvo ou se for 0/vazio, inicializa com o valor base calculado
-      if (agenteAtual.status.pv_max === undefined || agenteAtual.status.pv_max === null || agenteAtual.status.pv_max === "" || agenteAtual.status.pv_max === 0) {
-        pvMaxEl.value = pvMaxCalculado;
-        agenteAtual.status.pv_max = pvMaxCalculado;
-        if (deveSalvarNuvem) atualizarCampoDebounced("status", "pv_max", pvMaxCalculado);
-      } else {
-        // Se já tem valor definido no agente, garante sincronização se o jogador não estiver com foco nele
-        if (document.activeElement !== pvMaxEl && String(pvMaxEl.value) !== String(agenteAtual.status.pv_max)) {
-          pvMaxEl.value = agenteAtual.status.pv_max;
-        }
+      const textoModPv = pvMod !== 0 ? ` | Modificador permanente: ${pvMod > 0 ? "+" : ""}${pvMod}` : "";
+      pvMaxEl.title = `PV Máximo: ${pvTotal} (Base atributos: ${pvMaxBase}${textoModPv}. Editável manualmente)`;
+      if (document.activeElement !== pvMaxEl && String(pvMaxEl.value) !== String(pvTotal)) {
+        pvMaxEl.value = pvTotal;
       }
+    }
+    if (deveSalvarNuvem) {
+      atualizarCampoDebounced("status", "pv_max", pvTotal);
+      if (pvMod !== 0) atualizarCampoDebounced("status", "pv_max_mod", pvMod);
     }
 
     // Se PV atual estiver vazio ou indefinido, inicializa com o PV Máximo
     const pvEl = document.getElementById("status-pv");
-    const pvMaxAtual = parseInt(agenteAtual.status.pv_max) || pvMaxCalculado;
     if (pvEl && (agenteAtual.status.pv === undefined || agenteAtual.status.pv === null || agenteAtual.status.pv === "")) {
-      pvEl.value = pvMaxAtual;
-      agenteAtual.status.pv = pvMaxAtual;
-      if (deveSalvarNuvem) atualizarCampoDebounced("status", "pv", pvMaxAtual);
+      pvEl.value = pvTotal;
+      agenteAtual.status.pv = pvTotal;
+      if (deveSalvarNuvem) atualizarCampoDebounced("status", "pv", pvTotal);
     }
 
     // 2. PD Máximo: ((Inteligência + Sabedoria) / 5) + Humanidade Inicial (Regra Oficial pág. 32)
     const int = parseInt(agenteAtual.atributos?.inteligencia) || 0;
     const sab = parseInt(agenteAtual.atributos?.sabedoria) || 0;
     const hum = parseInt(agenteAtual.atributos?.humanidade) || 0;
-    const pdMaxCalculado = Math.floor((int + sab) / 5) + hum;
+    const pdMaxBase = Math.floor((int + sab) / 5) + hum;
     const pdMaxEl = document.getElementById("status-pd_max");
 
+    // Delta Inteligente para PD:
+    let pdMod = 0;
+    if (agenteAtual.status.pd_max_mod !== undefined && agenteAtual.status.pd_max_mod !== null) {
+      pdMod = Number(agenteAtual.status.pd_max_mod) || 0;
+    } else if (agenteAtual.status.pd_max && Number(agenteAtual.status.pd_max) > 0) {
+      pdMod = Number(agenteAtual.status.pd_max) - pdMaxBase;
+      agenteAtual.status.pd_max_mod = pdMod;
+    }
+    const pdTotal = Math.max(1, pdMaxBase + pdMod);
+    agenteAtual.status.pd_max = pdTotal;
+
     if (pdMaxEl) {
-      pdMaxEl.title = `PD Máximo (Base pelos atributos: ${pdMaxCalculado}. Editável manualmente)`;
-      if (agenteAtual.status.pd_max === undefined || agenteAtual.status.pd_max === null || agenteAtual.status.pd_max === "" || agenteAtual.status.pd_max === 0) {
-        pdMaxEl.value = pdMaxCalculado;
-        agenteAtual.status.pd_max = pdMaxCalculado;
-        if (deveSalvarNuvem) atualizarCampoDebounced("status", "pd_max", pdMaxCalculado);
-      } else {
-        if (document.activeElement !== pdMaxEl && String(pdMaxEl.value) !== String(agenteAtual.status.pd_max)) {
-          pdMaxEl.value = agenteAtual.status.pd_max;
-        }
+      const textoModPd = pdMod !== 0 ? ` | Modificador permanente: ${pdMod > 0 ? "+" : ""}${pdMod}` : "";
+      pdMaxEl.title = `PD Máximo: ${pdTotal} (Base atributos: ${pdMaxBase}${textoModPd}. Editável manualmente)`;
+      if (document.activeElement !== pdMaxEl && String(pdMaxEl.value) !== String(pdTotal)) {
+        pdMaxEl.value = pdTotal;
       }
+    }
+    if (deveSalvarNuvem) {
+      atualizarCampoDebounced("status", "pd_max", pdTotal);
+      if (pdMod !== 0) atualizarCampoDebounced("status", "pd_max_mod", pdMod);
     }
 
     // Se PD atual estiver vazio ou indefinido, inicializa com o PD Máximo
     const pdEl = document.getElementById("status-pd");
-    const pdMaxAtual = parseInt(agenteAtual.status.pd_max) || pdMaxCalculado;
     if (pdEl && (agenteAtual.status.pd === undefined || agenteAtual.status.pd === null || agenteAtual.status.pd === "")) {
-      pdEl.value = pdMaxAtual;
-      agenteAtual.status.pd = pdMaxAtual;
-      if (deveSalvarNuvem) atualizarCampoDebounced("status", "pd", pdMaxAtual);
+      pdEl.value = pdTotal;
+      agenteAtual.status.pd = pdTotal;
+      if (deveSalvarNuvem) atualizarCampoDebounced("status", "pd", pdTotal);
     }
 
     // 3. Dano Bônus (DB): Força + Corpo (Regra Oficial pág. 32)
@@ -4241,6 +4259,37 @@ if (formFicha) {
       // Proteção: não atualizar os valores "base" dinamicamente, já que são inalteráveis
       if (chave.includes("_base")) return;
 
+      if (categoria === "status" && (chave === "pv_max" || chave === "pd_max")) {
+        const valNum = Number(elemento.value);
+        if (!agenteAtual.status) agenteAtual.status = {};
+        if (chave === "pv_max") {
+          const vig = parseInt(agenteAtual.atributos?.vigor) || 0;
+          const cor = parseInt(agenteAtual.atributos?.corpo) || 0;
+          const base = Math.floor((vig + cor) / 5);
+          const mod = valNum > 0 ? (valNum - base) : 0;
+          agenteAtual.status.pv_max = valNum > 0 ? valNum : base;
+          agenteAtual.status.pv_max_mod = mod;
+          const txt = mod !== 0 ? ` | Modificador permanente: ${mod > 0 ? "+" : ""}${mod}` : "";
+          elemento.title = `PV Máximo: ${agenteAtual.status.pv_max} (Base atributos: ${base}${txt}. Editável manualmente)`;
+          atualizarCampoDebounced("status", "pv_max", agenteAtual.status.pv_max);
+          atualizarCampoDebounced("status", "pv_max_mod", mod);
+          return;
+        } else {
+          const int = parseInt(agenteAtual.atributos?.inteligencia) || 0;
+          const sab = parseInt(agenteAtual.atributos?.sabedoria) || 0;
+          const hum = parseInt(agenteAtual.atributos?.humanidade) || 0;
+          const base = Math.floor((int + sab) / 5) + hum;
+          const mod = valNum > 0 ? (valNum - base) : 0;
+          agenteAtual.status.pd_max = valNum > 0 ? valNum : base;
+          agenteAtual.status.pd_max_mod = mod;
+          const txt = mod !== 0 ? ` | Modificador permanente: ${mod > 0 ? "+" : ""}${mod}` : "";
+          elemento.title = `PD Máximo: ${agenteAtual.status.pd_max} (Base atributos: ${base}${txt}. Editável manualmente)`;
+          atualizarCampoDebounced("status", "pd_max", agenteAtual.status.pd_max);
+          atualizarCampoDebounced("status", "pd_max_mod", mod);
+          return;
+        }
+      }
+
       const valorTratado =
         elemento.type === "number"
           ? Number(elemento.value)
@@ -4273,6 +4322,7 @@ if (formFicha) {
       if (chave.includes("_base")) return;
 
       if (categoria === "status" && (chave === "pv_max" || chave === "pd_max")) {
+        if (!agenteAtual.status) agenteAtual.status = {};
         if (!elemento.value || Number(elemento.value) <= 0) {
           if (chave === "pv_max") {
             const vig = parseInt(agenteAtual.atributos?.vigor) || 0;
@@ -4280,7 +4330,10 @@ if (formFicha) {
             const base = Math.floor((vig + cor) / 5);
             elemento.value = base;
             agenteAtual.status.pv_max = base;
+            agenteAtual.status.pv_max_mod = 0;
+            elemento.title = `PV Máximo: ${base} (Calculado pelos atributos: ${base})`;
             atualizarCampoDebounced("status", "pv_max", base, true);
+            atualizarCampoDebounced("status", "pv_max_mod", 0, true);
             return;
           } else {
             const int = parseInt(agenteAtual.atributos?.inteligencia) || 0;
@@ -4289,7 +4342,10 @@ if (formFicha) {
             const base = Math.floor((int + sab) / 5) + hum;
             elemento.value = base;
             agenteAtual.status.pd_max = base;
+            agenteAtual.status.pd_max_mod = 0;
+            elemento.title = `PD Máximo: ${base} (Calculado pelos atributos: ${base})`;
             atualizarCampoDebounced("status", "pd_max", base, true);
+            atualizarCampoDebounced("status", "pd_max_mod", 0, true);
             return;
           }
         }
