@@ -1488,7 +1488,10 @@
               <button type="button" id="btn-add-equipamento" class="interactive-add-btn">+ Equipamento</button>
             </div>
             <div class="boxed-area goods-box">
-              <span>BENS MATERIAIS</span>
+              <div class="boxed-area-header-flex">
+                <span>BENS MATERIAIS</span>
+                <button type="button" class="btn-texto-antigo" onclick="window.abrirModalTextoAntigo('bens')" title="Ver texto original das anotações">Texto antigo</button>
+              </div>
               <div id="recursos-bens_materiais-lista" class="interactive-container"></div>
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                 <button type="button" id="btn-add-moradia" class="interactive-add-btn" style="margin-top:0;">+ Moradia</button>
