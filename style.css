@@ -2114,3 +2114,78 @@ body.dark-theme #modal-selecao-filter {
   border-color: #666666 !important;
 }
 
+/* Header Flex para caixas interativas com botão de Texto antigo */
+.boxed-area-header-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.btn-texto-antigo {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10px;
+  font-family: inherit;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.2s ease;
+  line-height: 1.2;
+}
+
+.btn-texto-antigo:hover {
+  background: var(--line);
+  color: var(--panel);
+}
+
+body.dark-theme .btn-texto-antigo {
+  border-color: #666;
+  color: #bbb;
+}
+
+body.dark-theme .btn-texto-antigo:hover {
+  background: #444;
+  color: #fff;
+}
+
+.tab-btn-texto-antigo {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab-btn-texto-antigo:hover {
+  color: var(--ink);
+}
+
+.tab-btn-texto-antigo.active {
+  color: var(--ink);
+  border-bottom: 2px solid var(--ink);
+}
+
+body.dark-theme .tab-btn-texto-antigo {
+  color: #888;
+}
+
+body.dark-theme .tab-btn-texto-antigo:hover {
+  color: #fff;
+}
+
+body.dark-theme .tab-btn-texto-antigo.active {
+  color: #fff;
+  border-bottom-color: #fff;
+}
+
+

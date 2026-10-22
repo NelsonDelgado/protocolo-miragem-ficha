@@ -310,42 +310,355 @@ function sanitizarParaFirestore(val) {
   return limpo;
 }
 
+function normalizarTextoParaBusca(str) {
+  if (!str) return "";
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function detectarEHealarHabilidadesFragmentadas(lista) {
+  if (!Array.isArray(lista) || lista.length < 2) return null;
+
+  let temSeparador = false;
+  let itemsMesmoNomeEDesc = 0;
+  let frasesQuebradas = 0;
+
+  lista.forEach(item => {
+    const nome = (item?.nome || "").trim();
+    const desc = (item?.descricao || "").trim();
+    if (nome.includes("---") || nome.includes("===") || nome.includes("___")) {
+      temSeparador = true;
+    }
+    if (desc && nome.toLowerCase() === desc.toLowerCase()) {
+      itemsMesmoNomeEDesc++;
+    }
+    if (/^[a-zà-ÿ]/.test(nome)) {
+      frasesQuebradas++;
+    }
+  });
+
+  const ehFragmentado = temSeparador || (itemsMesmoNomeEDesc >= 2 && itemsMesmoNomeEDesc / lista.length >= 0.4) || (frasesQuebradas >= 2);
+  if (!ehFragmentado) return null;
+
+  // Remontar o texto original unindo os fragmentos
+  const linhas = lista.map(item => {
+    if (typeof item === "string") return item;
+    return item?.nome || item?.descricao || "";
+  }).filter(Boolean);
+
+  return linhas.join("\n");
+}
+
+function parsearHabilidadesLegadas(raw) {
+  if (!raw || typeof raw !== "string") return [];
+
+  const catalog = [...(REGRAS.habilidades || []), ...(REGRAS.poderes || [])];
+
+  // Normalizar divisores de 3 ou mais traços, iguais ou sublinhados
+  const textoComMarcadores = raw.replace(/\s*[-=_*]{3,}\s*/g, "\n@@BLOCO_SEP@@\n");
+  const blocosBrutos = textoComMarcadores.split(/(?:\r?\n\s*\r?\n+)|\n?@@BLOCO_SEP@@\n?/);
+
+  const resultado = [];
+
+  blocosBrutos.forEach((bloco, idx) => {
+    const limpo = bloco.trim();
+    if (!limpo) return;
+
+    const linhas = limpo.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (linhas.length === 0) return;
+
+    let cabecalho = linhas[0];
+    let descricao = linhas.slice(1).join(" ");
+
+    // Se só tem uma linha e tem dois pontos: "Nome: Descrição"
+    if (linhas.length === 1 && cabecalho.includes(":")) {
+      const idxDoisPontos = cabecalho.indexOf(":");
+      descricao = cabecalho.slice(idxDoisPontos + 1).trim();
+      cabecalho = cabecalho.slice(0, idxDoisPontos).trim();
+    }
+
+    // Limpar marcadores de lista no cabeçalho (ex: "- ", "• ", "1. ")
+    cabecalho = cabecalho.replace(/^[-•*]\s*/, "").replace(/^\d+[\.\-\)]\s*/, "").trim();
+
+    // Extrair possível custo embutido no título (ex: "ARTE DO VÉU - 1 DE GC" ou "Ataque Furtivo (1 PD)")
+    let custo = "-";
+    let nomeHabilidade = cabecalho;
+
+    const matchCustoParenteses = cabecalho.match(/\(([^)]*(?:PD|GC|PV|PE)[^)]*)\)/i);
+    if (matchCustoParenteses) {
+      custo = matchCustoParenteses[1].trim();
+      nomeHabilidade = cabecalho.replace(matchCustoParenteses[0], "").trim();
+    } else {
+      const matchCustoTraco = cabecalho.match(/\s*[-–—:]\s*([0-9]+\s*(?:DE\s*)?(?:PD|GC|PV|PE)[^)]*)$/i);
+      if (matchCustoTraco) {
+        custo = matchCustoTraco[1].trim();
+        nomeHabilidade = cabecalho.replace(matchCustoTraco[0], "").trim();
+      }
+    }
+
+    // Tentar correspondência oficial nas REGRAS
+    const nomeNorm = normalizarTextoParaBusca(nomeHabilidade);
+    const oficial = catalog.find(item => {
+      const itemNorm = normalizarTextoParaBusca(item.nome);
+      return itemNorm === nomeNorm || (nomeNorm.length > 5 && itemNorm.includes(nomeNorm));
+    });
+
+    if (oficial) {
+      const isPoder = oficial.type === "poder" || oficial.vertente !== undefined;
+      resultado.push({
+        id: Date.now() + idx,
+        nome: oficial.nome,
+        tipo: isPoder ? "poder" : "habilidade",
+        categoria: oficial.categoria || "Geral",
+        vertente: oficial.vertente || "Uncanny",
+        custo: custo !== "-" ? custo : (oficial.custo || "-"),
+        requisito: oficial.requisito || "-",
+        afinidade: oficial.afinidade || "",
+        afinidadeAtiva: false,
+        descricao: descricao || oficial.descricao || ""
+      });
+    } else {
+      resultado.push({
+        id: Date.now() + idx,
+        nome: nomeHabilidade || `Habilidade ${idx + 1}`,
+        tipo: "habilidade",
+        categoria: "Geral",
+        custo: custo,
+        requisito: "-",
+        descricao: descricao || cabecalho
+      });
+    }
+  });
+
+  return resultado;
+}
+
+function parsearEquipamentosLegados(raw) {
+  if (!raw || typeof raw !== "string") return { equipamentos: [], armas: [] };
+
+  const catalogArmas = REGRAS.armas || [];
+  const catalogGerais = [
+    ...(REGRAS.equipamentosGerais || []),
+    ...(REGRAS.vestimentas || []),
+    ...(REGRAS.explosivos || []),
+    ...(REGRAS.equipamentosVeu || [])
+  ];
+
+  const linhas = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const equipamentos = [];
+  const armas = [];
+
+  linhas.forEach((linha, idx) => {
+    let texto = linha.replace(/^[-•*]\s*/, "").trim();
+    if (!texto || /^[-=_*]{3,}$/.test(texto)) return;
+
+    let qtd = 1;
+    const matchQtdInicio = texto.match(/^(\d+)\s*[xX]\s+(.+)/);
+    if (matchQtdInicio) {
+      qtd = parseInt(matchQtdInicio[1], 10) || 1;
+      texto = matchQtdInicio[2].trim();
+    } else {
+      const matchQtdFim = texto.match(/\s*[xX](\d+)$/);
+      if (matchQtdFim) {
+        qtd = parseInt(matchQtdFim[1], 10) || 1;
+        texto = texto.replace(matchQtdFim[0], "").trim();
+      }
+    }
+
+    let peso = 0;
+    const matchPeso = texto.match(/[-–—(]\s*([0-9]+(?:[\.,][0-9]+)?)\s*k?g\s*\)?/i);
+    if (matchPeso) {
+      peso = parseFloat(matchPeso[1].replace(",", ".")) || 0;
+      texto = texto.replace(matchPeso[0], "").trim();
+    }
+
+    texto = texto.replace(/[-–—:]$/, "").trim();
+
+    const nomeNorm = normalizarTextoParaBusca(texto);
+    const armaOficial = catalogArmas.find(a => {
+      const aNorm = normalizarTextoParaBusca(a.nome);
+      return aNorm === nomeNorm || (nomeNorm.length > 4 && aNorm.includes(nomeNorm));
+    });
+
+    if (armaOficial) {
+      armas.push({
+        id: Date.now() + idx,
+        nome: armaOficial.nome,
+        tipo: armaOficial.tipo || "Arma",
+        categoria: armaOficial.categoria || "Geral",
+        dano: armaOficial.dano || "1d6",
+        critico: armaOficial.critico || "x2",
+        alcance: armaOficial.alcance || "Curto",
+        peso: armaOficial.peso !== undefined ? armaOficial.peso : (peso || 1),
+        espaco: armaOficial.espaco || 1,
+        munAtual: armaOficial.munMax || 0,
+        munMax: armaOficial.munMax || 0,
+        pentes: armaOficial.munMax > 0 ? 1 : 0,
+        descricao: armaOficial.descricao || ""
+      });
+      return;
+    }
+
+    const eqOficial = catalogGerais.find(g => {
+      const gNorm = normalizarTextoParaBusca(g.nome);
+      return gNorm === nomeNorm || (nomeNorm.length > 4 && gNorm.includes(nomeNorm));
+    });
+
+    if (eqOficial) {
+      equipamentos.push({
+        id: Date.now() + idx,
+        nome: eqOficial.nome,
+        tipo: eqOficial.category || eqOficial.tipo || "Equipamento",
+        peso: eqOficial.peso !== undefined ? eqOficial.peso : peso,
+        qtd: qtd,
+        espaco: eqOficial.espaco || 1,
+        descricao: eqOficial.descricao || ""
+      });
+      return;
+    }
+
+    equipamentos.push({
+      id: Date.now() + idx,
+      nome: texto,
+      tipo: "Equipamento",
+      peso: peso,
+      qtd: qtd,
+      descricao: ""
+    });
+  });
+
+  return { equipamentos, armas };
+}
+
+function parsearTraumasLegados(raw) {
+  if (!raw || typeof raw !== "string") return [];
+  const linhas = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const resultado = [];
+
+  linhas.forEach((linha, idx) => {
+    let texto = linha.replace(/^[-•*]\s*/, "").trim();
+    if (!texto || /^[-=_*]{3,}$/.test(texto)) return;
+
+    let tipo = "fobia";
+    let nome = texto;
+    let efeito = "";
+
+    const matchTipo = texto.match(/^\[?(Fobia|Mania|Ferimento|Maldição|Maldicao)\]?[:\s-]+(.*)/i);
+    if (matchTipo) {
+      const tipoDetectado = matchTipo[1].toLowerCase();
+      if (tipoDetectado.includes("mania")) tipo = "mania";
+      else if (tipoDetectado.includes("ferimento")) tipo = "ferimento";
+      else if (tipoDetectado.includes("maldic")) tipo = "maldicao";
+      else tipo = "fobia";
+      texto = matchTipo[2].trim();
+    }
+
+    if (texto.includes(":")) {
+      const partes = texto.split(/:\s*(.+)/);
+      nome = partes[0].trim();
+      efeito = partes[1] ? partes[1].trim() : "";
+    } else if (texto.includes(" - ")) {
+      const partes = texto.split(/\s+-\s+(.+)/);
+      nome = partes[0].trim();
+      efeito = partes[1] ? partes[1].trim() : "";
+    } else {
+      nome = texto;
+    }
+
+    resultado.push({
+      id: Date.now() + idx,
+      nome: nome,
+      tipo: tipo,
+      efeito: efeito
+    });
+  });
+
+  return resultado;
+}
+
+function parsearRituaisLegados(raw) {
+  if (!raw || typeof raw !== "string") return [];
+  const catalog = REGRAS.rituais || [];
+  const textoComMarcadores = raw.replace(/\s*[-=_*]{3,}\s*/g, "\n@@BLOCO_SEP@@\n");
+  const blocos = textoComMarcadores.split(/(?:\r?\n\s*\r?\n+)|\n?@@BLOCO_SEP@@\n?/);
+  const resultado = [];
+
+  blocos.forEach((bloco, idx) => {
+    const limpo = bloco.trim();
+    if (!limpo) return;
+    const linhas = limpo.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (linhas.length === 0) return;
+
+    let cabecalho = linhas[0].replace(/^[-•*]\s*/, "").trim();
+    let desc = linhas.slice(1).join(" ");
+
+    if (linhas.length === 1 && cabecalho.includes(":")) {
+      const p = cabecalho.split(/:\s*(.+)/);
+      cabecalho = p[0].trim();
+      desc = p[1] ? p[1].trim() : "";
+    }
+
+    const nomeNorm = normalizarTextoParaBusca(cabecalho);
+    const oficial = catalog.find(r => {
+      const rNorm = normalizarTextoParaBusca(r.nome);
+      return rNorm === nomeNorm || (nomeNorm.length > 4 && rNorm.includes(nomeNorm));
+    });
+
+    if (oficial) {
+      resultado.push({
+        id: Date.now() + idx,
+        nome: oficial.nome,
+        circulo: oficial.circulo || "1º Círculo",
+        aspecto: oficial.aspecto || "Geral",
+        custo: oficial.custo || "-",
+        alc: oficial.alc || "-",
+        target: oficial.target || "-",
+        duracao: oficial.duracao || "-",
+        resistencia: oficial.resistencia || "-",
+        condicao: oficial.condicao || "-",
+        desc: desc || oficial.desc || ""
+      });
+    } else {
+      resultado.push({
+        id: Date.now() + idx,
+        nome: cabecalho || `Ritual ${idx + 1}`,
+        circulo: "1º Círculo",
+        aspecto: "Geral",
+        custo: "-",
+        alc: "-",
+        target: "-",
+        duracao: "-",
+        resistencia: "-",
+        condicao: "-",
+        desc: desc || cabecalho
+      });
+    }
+  });
+
+  return resultado;
+}
+
 function normalizarAgente(agente) {
   const nome = agente && agente.identidade ? agente.identidade.nome : "";
   const combinado = combinarEstruturaPadrao(criarAgenteEmBranco(nome), agente || {});
 
-  // Compatibilidade retroativa com fichas antigas (onde campos eram texto puro ou arrays de strings):
-  
+  // Preservar texto_antigo já existente na ficha para não perder dados originais
+  if (agente?.habilidades?.texto_antigo) combinado.habilidades.texto_antigo = agente.habilidades.texto_antigo;
+  if (agente?.inventario?.texto_antigo) combinado.inventario.texto_antigo = agente.inventario.texto_antigo;
+  if (agente?.perfil?.traumas_antigo) combinado.perfil.traumas_antigo = agente.perfil.traumas_antigo;
+  if (agente?.habilidades?.rituais_antigo) combinado.habilidades.rituais_antigo = agente.habilidades.rituais_antigo;
+  if (agente?.recursos?.bens_antigo) combinado.recursos.bens_antigo = agente.recursos.bens_antigo;
+
   // 1. Traumas Clínicos (Fobias, Manias, Ferimentos, Maldições)
   if (typeof combinado.perfil?.traumas === "string") {
     const raw = combinado.perfil.traumas.trim();
-    if (raw) {
-      const linhas = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-      combinado.perfil.traumas = linhas.map((linha, idx) => {
-        const partes = linha.split(/:\s*(.+)/);
-        return {
-          id: Date.now() + idx,
-          nome: partes[0] ? partes[0].trim() : linha,
-          tipo: "fobia",
-          efeito: partes[1] ? partes[1].trim() : "",
-        };
-      });
-    } else {
-      combinado.perfil.traumas = [];
-    }
+    if (!combinado.perfil.traumas_antigo) combinado.perfil.traumas_antigo = raw;
+    combinado.perfil.traumas = parsearTraumasLegados(raw);
   } else if (Array.isArray(combinado.perfil?.traumas)) {
-    combinado.perfil.traumas = combinado.perfil.traumas.map((t, idx) => {
-      if (typeof t === "string") {
-        const partes = t.split(/:\s*(.+)/);
-        return {
-          id: Date.now() + idx,
-          nome: partes[0] ? partes[0].trim() : t,
-          tipo: "fobia",
-          efeito: partes[1] ? partes[1].trim() : "",
-        };
-      }
-      return t;
-    });
+    if (combinado.perfil.traumas.some(t => typeof t === "string")) {
+      const raw = combinado.perfil.traumas.map(t => typeof t === "string" ? t : (t.nome + ": " + t.efeito)).join("\n");
+      if (!combinado.perfil.traumas_antigo) combinado.perfil.traumas_antigo = raw;
+      combinado.perfil.traumas = parsearTraumasLegados(raw);
+    }
   } else {
     combinado.perfil.traumas = [];
   }
@@ -353,46 +666,26 @@ function normalizarAgente(agente) {
   // 2. Habilidades e Poderes
   if (typeof combinado.habilidades?.lista === "string") {
     const raw = combinado.habilidades.lista.trim();
-    if (raw) {
-      const blocos = raw.split(/\r?\n(?=[A-Za-z0-9À-ÿ])/);
-      combinado.habilidades.lista = blocos.map((bloco, idx) => {
-        const partes = bloco.split(/:\s*(.+)/s);
-        const nome = partes[0] ? partes[0].trim() : `Habilidade ${idx + 1}`;
-        const desc = partes[1] ? partes[1].trim() : bloco.trim();
-        return {
-          id: Date.now() + idx,
-          nome: nome,
-          tipo: "habilidade",
-          categoria: "Geral",
-          custo: "-",
-          requisito: "-",
-          descricao: desc,
-        };
-      });
-    } else {
-      combinado.habilidades.lista = [];
-    }
+    if (!combinado.habilidades.texto_antigo) combinado.habilidades.texto_antigo = raw;
+    combinado.habilidades.lista = parsearHabilidadesLegadas(raw);
   } else if (Array.isArray(combinado.habilidades?.lista)) {
-    combinado.habilidades.lista = combinado.habilidades.lista.map((h, idx) => {
-      if (typeof h === "string") {
-        const partes = h.split(/:\s*(.+)/s);
-        return {
-          id: Date.now() + idx,
-          nome: partes[0] ? partes[0].trim() : h,
-          tipo: "habilidade",
-          categoria: "Geral",
-          custo: "-",
-          requisito: "-",
-          descricao: partes[1] ? partes[1].trim() : h,
-        };
-      }
-      if (typeof h === "object" && h !== null) {
-        if (h.tipo === "poder") {
-          h.afinidadeAtiva = !!h.afinidadeAtiva;
+    // Detectar se a lista está fragmentada pelo bug anterior
+    const rawHeal = detectarEHealarHabilidadesFragmentadas(combinado.habilidades.lista);
+    if (rawHeal) {
+      if (!combinado.habilidades.texto_antigo) combinado.habilidades.texto_antigo = rawHeal;
+      combinado.habilidades.lista = parsearHabilidadesLegadas(rawHeal);
+    } else {
+      // Lista saudável de objetos
+      combinado.habilidades.lista = combinado.habilidades.lista.map(h => {
+        if (typeof h === "string") {
+          return { id: Date.now(), nome: h, tipo: "habilidade", categoria: "Geral", custo: "-", requisito: "-", descricao: h };
         }
-      }
-      return h;
-    });
+        if (h && typeof h === "object") {
+          if (h.tipo === "poder") h.afinidadeAtiva = !!h.afinidadeAtiva;
+        }
+        return h;
+      });
+    }
   } else {
     combinado.habilidades.lista = [];
   }
@@ -400,52 +693,14 @@ function normalizarAgente(agente) {
   // 3. Rituais
   if (typeof combinado.habilidades?.rituais === "string") {
     const raw = combinado.habilidades.rituais.trim();
-    if (raw) {
-      const blocos = raw.split(/\r?\n(?=[A-Za-z0-9À-ÿ])/);
-      combinado.habilidades.rituais = blocos.map((bloco, idx) => {
-        const partes = bloco.split(/:\s*(.+)/s);
-        const nome = partes[0] ? partes[0].trim() : `Ritual ${idx + 1}`;
-        const desc = partes[1] ? partes[1].trim() : bloco.trim();
-        return {
-          id: Date.now() + idx,
-          nome: nome,
-          circulo: "1º Círculo",
-          aspecto: "Geral",
-          custo: "-",
-          alc: "-",
-          target: "-",
-          duracao: "-",
-          resistencia: "-",
-          condicao: "-",
-          desc: desc,
-        };
-      });
-    } else {
-      combinado.habilidades.rituais = [];
-    }
+    if (!combinado.habilidades.rituais_antigo) combinado.habilidades.rituais_antigo = raw;
+    combinado.habilidades.rituais = parsearRituaisLegados(raw);
   } else if (Array.isArray(combinado.habilidades?.rituais)) {
-    combinado.habilidades.rituais = combinado.habilidades.rituais.map((r, idx) => {
-      if (typeof r === "string") {
-        const partes = r.split(/:\s*(.+)/s);
-        return {
-          id: Date.now() + idx,
-          nome: partes[0] ? partes[0].trim() : r,
-          circulo: "1º Círculo",
-          aspecto: "Geral",
-          custo: "-",
-          alc: "-",
-          target: "-",
-          duracao: "-",
-          resistencia: "-",
-          condicao: "-",
-          desc: partes[1] ? partes[1].trim() : r,
-        };
-      }
-      if (typeof r === "object" && r !== null) {
-        if (r.condicao === undefined) r.condicao = "-";
-      }
-      return r;
-    });
+    if (combinado.habilidades.rituais.some(r => typeof r === "string")) {
+      const raw = combinado.habilidades.rituais.map(r => typeof r === "string" ? r : (r.nome + ": " + (r.desc || ""))).join("\n");
+      if (!combinado.habilidades.rituais_antigo) combinado.habilidades.rituais_antigo = raw;
+      combinado.habilidades.rituais = parsearRituaisLegados(raw);
+    }
   } else {
     combinado.habilidades.rituais = [];
   }
@@ -457,23 +712,21 @@ function normalizarAgente(agente) {
   if (!Array.isArray(combinado.inventario.armas)) {
     combinado.inventario.armas = [];
   }
-  if (!Array.isArray(combinado.inventario.equipamentos)) {
-    if (typeof combinado.inventario.equipamentos === "string" && combinado.inventario.equipamentos.trim()) {
-      const linhas = combinado.inventario.equipamentos.trim().split(/\r?\n/);
-      combinado.inventario.equipamentos = linhas.map((linha, idx) => ({
-        id: Date.now() + idx,
-        nome: linha.trim(),
-        tipo: "Equipamento",
-        peso: 0,
-        qtd: 1
-      })).filter(x => x.nome);
-    } else {
-      combinado.inventario.equipamentos = [];
+
+  if (typeof combinado.inventario.equipamentos === "string") {
+    const raw = combinado.inventario.equipamentos.trim();
+    if (!combinado.inventario.texto_antigo) combinado.inventario.texto_antigo = raw;
+    const { equipamentos, armas } = parsearEquipamentosLegados(raw);
+    combinado.inventario.equipamentos = equipamentos;
+    if (armas.length > 0 && combinado.inventario.armas.length === 0) {
+      combinado.inventario.armas = armas;
     }
+  } else if (!Array.isArray(combinado.inventario.equipamentos)) {
+    combinado.inventario.equipamentos = [];
   }
 
   // Migrar armas antigas da lista de equipamentos apenas se armas estiver vazio
-  if (combinado.inventario.armas.length === 0) {
+  if (combinado.inventario.armas.length === 0 && combinado.inventario.equipamentos.length > 0) {
     const equipamentosNaoArmas = [];
     combinado.inventario.equipamentos.forEach(item => {
       const isArma = item.tipo && (
@@ -491,8 +744,8 @@ function normalizarAgente(agente) {
       }
     });
     combinado.inventario.equipamentos = equipamentosNaoArmas;
-  } else {
-    // Se a lista de armas já possui itens, limpamos qualquer arma que sobrou em equipamentos
+  } else if (combinado.inventario.armas.length > 0) {
+    // Se armas já possui itens, limpamos qualquer arma duplicada que sobrou em equipamentos
     combinado.inventario.equipamentos = combinado.inventario.equipamentos.filter(item => {
       const isArma = item.tipo && (
         item.tipo.toLowerCase().includes("cc") ||
@@ -521,6 +774,7 @@ function normalizarAgente(agente) {
   }
   if (typeof combinado.recursos.bens_materiais === "string") {
     const raw = combinado.recursos.bens_materiais.trim();
+    if (!combinado.recursos.bens_antigo) combinado.recursos.bens_antigo = raw;
     if (raw) {
       const linhas = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
       combinado.recursos.bens_materiais = linhas.map((linha, idx) => ({
@@ -3650,6 +3904,108 @@ if (formFicha) {
     }
     if (filterSelect) {
       filterSelect.onchange = () => filtrarItensModal();
+    }
+
+    setupModalTextoAntigo();
+  };
+
+  window.abrirModalTextoAntigo = (secao = "habilidades") => {
+    const modal = document.getElementById("modal-texto-antigo");
+    if (!modal) return;
+
+    const tabBtns = modal.querySelectorAll(".tab-btn-texto-antigo");
+    tabBtns.forEach(btn => {
+      btn.classList.toggle("active", btn.getAttribute("data-tab") === secao);
+    });
+
+    carregarTextoAntigoSecao(secao);
+    modal.classList.remove("hidden");
+  };
+
+  function carregarTextoAntigoSecao(secao) {
+    const textarea = document.getElementById("modal-texto-antigo-conteudo");
+    if (!textarea) return;
+
+    let texto = "";
+    if (secao === "habilidades") {
+      texto = agenteAtual?.habilidades?.texto_antigo || "";
+      if (!texto && Array.isArray(agenteAtual?.habilidades?.lista)) {
+        texto = agenteAtual.habilidades.lista.map(h => {
+          let bloco = (h.nome || "");
+          if (h.custo && h.custo !== "-") bloco += ` (${h.custo})`;
+          if (h.descricao) bloco += `\n${h.descricao}`;
+          return bloco;
+        }).join("\n\n----------------------------------\n\n");
+      }
+    } else if (secao === "equipamentos") {
+      texto = agenteAtual?.inventario?.texto_antigo || "";
+      if (!texto && (Array.isArray(agenteAtual?.inventario?.equipamentos) || Array.isArray(agenteAtual?.inventario?.armas))) {
+        const armas = (agenteAtual?.inventario?.armas || []).map(a => `${a.nome || "Arma"} (Dano: ${a.dano || "-"}, Peso: ${a.peso || 0}kg)`);
+        const eqs = (agenteAtual?.inventario?.equipamentos || []).map(e => `${e.nome || "Item"} (Peso: ${e.peso || 0}kg, Qtd: ${e.qtd || 1})`);
+        texto = [...armas, ...eqs].join("\n");
+      }
+    } else if (secao === "traumas") {
+      texto = agenteAtual?.perfil?.traumas_antigo || "";
+      if (!texto && Array.isArray(agenteAtual?.perfil?.traumas)) {
+        texto = agenteAtual.perfil.traumas.map(t => `${t.tipo ? `[${t.tipo.toUpperCase()}] ` : ""}${t.nome || ""}${t.efeito ? `: ${t.efeito}` : ""}`).join("\n");
+      }
+    } else if (secao === "rituais") {
+      texto = agenteAtual?.habilidades?.rituais_antigo || "";
+      if (!texto && Array.isArray(agenteAtual?.habilidades?.rituais)) {
+        texto = agenteAtual.habilidades.rituais.map(r => `${r.nome || ""} (${r.circulo || ""})\n${r.desc || ""}`).join("\n\n----------------------------------\n\n");
+      }
+    } else if (secao === "bens") {
+      texto = agenteAtual?.recursos?.bens_antigo || "";
+      if (!texto && Array.isArray(agenteAtual?.recursos?.bens_materiais)) {
+        texto = agenteAtual.recursos.bens_materiais.map(b => `${b.nome || "Bem"} (${b.tipo || "moradia"})`).join("\n");
+      }
+    }
+
+    textarea.value = texto.trim() || "Nenhuma anotação antiga encontrada para esta seção.";
+  }
+
+  const setupModalTextoAntigo = () => {
+    const modal = document.getElementById("modal-texto-antigo");
+    const closeBtn = document.getElementById("modal-texto-antigo-close");
+    const fecharBtn = document.getElementById("modal-texto-antigo-fechar");
+    const copiarBtn = document.getElementById("modal-texto-antigo-copiar");
+    const tabBtns = modal ? modal.querySelectorAll(".tab-btn-texto-antigo") : [];
+
+    const fechar = () => {
+      if (modal) modal.classList.add("hidden");
+    };
+
+    if (closeBtn) closeBtn.onclick = fechar;
+    if (fecharBtn) fecharBtn.onclick = fechar;
+    if (modal) {
+      modal.onclick = (e) => {
+        if (e.target === modal) fechar();
+      };
+    }
+
+    tabBtns.forEach(btn => {
+      btn.onclick = () => {
+        tabBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        carregarTextoAntigoSecao(btn.getAttribute("data-tab"));
+      };
+    });
+
+    if (copiarBtn) {
+      copiarBtn.onclick = () => {
+        const textarea = document.getElementById("modal-texto-antigo-conteudo");
+        if (!textarea || !textarea.value) return;
+        navigator.clipboard.writeText(textarea.value).then(() => {
+          const originalText = copiarBtn.textContent;
+          copiarBtn.textContent = "Copiado!";
+          setTimeout(() => {
+            copiarBtn.textContent = originalText;
+          }, 1500);
+        }).catch(() => {
+          textarea.select();
+          document.execCommand("copy");
+        });
+      };
     }
   };
 
