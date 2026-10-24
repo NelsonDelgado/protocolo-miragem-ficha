@@ -4377,7 +4377,9 @@ if (formFicha) {
       agenteAtual[categoria][chave] = valorTratado;
 
       if (categoria === "atributos") {
-        atualizarCalculosAutomaticos(true);
+        if (chave !== "humanidade" && chave !== "carisma") {
+          atualizarCalculosAutomaticos(true);
+        }
       }
 
       // Salva imediatamente com delay reduzido ao sair do campo
