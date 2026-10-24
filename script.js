@@ -119,12 +119,13 @@ function criarAgenteEmBranco(nomeInicial) {
       aumento_atributo_cura: "",
       total_niveis: "",
     },
-    status: { pv: 0, pv_max: 0, pd: 0, pd_max: 0, gc: 50 },
+    status: { pv: 0, pv_max: 0, pd: 0, pd_max: 0, gc: 50, pv_max_mod: 0, pd_max_mod: 0 },
     atributos: {
       forca: 0,
       inteligencia: 0,
       carisma: 0,
       humanidade: 0,
+      humanidade_inicial: 0,
       vigor: 0,
       corpo: 0,
       sabedoria: 0,
@@ -647,6 +648,30 @@ function normalizarAgente(agente) {
   if (agente?.perfil?.traumas_antigo) combinado.perfil.traumas_antigo = agente.perfil.traumas_antigo;
   if (agente?.habilidades?.rituais_antigo) combinado.habilidades.rituais_antigo = agente.habilidades.rituais_antigo;
   if (agente?.recursos?.bens_antigo) combinado.recursos.bens_antigo = agente.recursos.bens_antigo;
+
+  // Normalização de status e cura de modificadores residuais corrompidos
+  if (!combinado.status) combinado.status = {};
+  if (combinado.status.pv_max_mod === undefined || combinado.status.pv_max_mod === null) combinado.status.pv_max_mod = 0;
+  if (combinado.status.pd_max_mod === undefined || combinado.status.pd_max_mod === null) combinado.status.pd_max_mod = 0;
+  if (!combinado.atributos) combinado.atributos = {};
+  if (!combinado.atributos.humanidade_inicial && combinado.atributos.humanidade) {
+    combinado.atributos.humanidade_inicial = combinado.atributos.humanidade;
+  }
+
+  const vigNorm = parseInt(combinado.atributos?.vigor) || 0;
+  const corNorm = parseInt(combinado.atributos?.corpo) || 0;
+  const basePvNorm = Math.floor((vigNorm + corNorm) / 5);
+  if (basePvNorm > 1 && combinado.status.pv_max_mod === (1 - basePvNorm)) {
+    combinado.status.pv_max_mod = 0;
+  }
+
+  const intNorm = parseInt(combinado.atributos?.inteligencia) || 0;
+  const sabNorm = parseInt(combinado.atributos?.sabedoria) || 0;
+  const humIniNorm = parseInt(combinado.atributos?.humanidade_inicial) || parseInt(combinado.atributos?.humanidade) || 0;
+  const basePdNorm = Math.floor((intNorm + sabNorm) / 5) + humIniNorm;
+  if (basePdNorm > 1 && combinado.status.pd_max_mod === (1 - basePdNorm)) {
+    combinado.status.pd_max_mod = 0;
+  }
 
   // 1. Traumas Clínicos (Fobias, Manias, Ferimentos, Maldições)
   if (typeof combinado.perfil?.traumas === "string") {
@@ -1839,7 +1864,7 @@ if (formFicha) {
       )
     );
 
-    // 1. PV Máximo: (Vigor + Corpo) / 5 (Regra Oficial pág. 32)
+    // 1. PV Máximo: (Vigor + Corpo) / 5 (Regra Oficial pág. 31)
     const vig = parseInt(agenteAtual.atributos?.vigor) || 0;
     const cor = parseInt(agenteAtual.atributos?.corpo) || 0;
     const pvMaxBase = Math.floor((vig + cor) / 5);
@@ -1847,74 +1872,76 @@ if (formFicha) {
 
     if (!agenteAtual.status) agenteAtual.status = {};
 
-    // Delta Inteligente para PV:
-    let pvMod = 0;
-    if (agenteAtual.status.pv_max_mod !== undefined && agenteAtual.status.pv_max_mod !== null) {
-      pvMod = Number(agenteAtual.status.pv_max_mod) || 0;
-    } else if (agenteAtual.status.pv_max && Number(agenteAtual.status.pv_max) > 0) {
-      // Se já existia um pv_max salvo, calcula o delta inicial em relação à base
-      pvMod = Number(agenteAtual.status.pv_max) - pvMaxBase;
-      agenteAtual.status.pv_max_mod = pvMod;
+    let pvMod = Number(agenteAtual.status.pv_max_mod) || 0;
+    // Auto-cura do bug de delta residual
+    if (pvMaxBase > 1 && pvMod === (1 - pvMaxBase)) {
+      pvMod = 0;
+      agenteAtual.status.pv_max_mod = 0;
     }
-    const pvTotal = Math.max(1, pvMaxBase + pvMod);
+
+    const pvTotal = pvMaxBase > 0 ? Math.max(1, pvMaxBase + pvMod) : (pvMod > 0 ? pvMod : 0);
     agenteAtual.status.pv_max = pvTotal;
 
     if (pvMaxEl) {
       const textoModPv = pvMod !== 0 ? ` | Modificador permanente: ${pvMod > 0 ? "+" : ""}${pvMod}` : "";
       pvMaxEl.title = `PV Máximo: ${pvTotal} (Base atributos: ${pvMaxBase}${textoModPv}. Editável manualmente)`;
-      if (document.activeElement !== pvMaxEl && String(pvMaxEl.value) !== String(pvTotal)) {
-        pvMaxEl.value = pvTotal;
+      if (document.activeElement !== pvMaxEl) {
+        pvMaxEl.value = pvTotal > 0 ? pvTotal : "";
       }
     }
     if (deveSalvarNuvem) {
       atualizarCampoDebounced("status", "pv_max", pvTotal);
-      if (pvMod !== 0) atualizarCampoDebounced("status", "pv_max_mod", pvMod);
+      atualizarCampoDebounced("status", "pv_max_mod", pvMod);
     }
 
     // Se PV atual estiver vazio ou indefinido, inicializa com o PV Máximo
     const pvEl = document.getElementById("status-pv");
     if (pvEl && (agenteAtual.status.pv === undefined || agenteAtual.status.pv === null || agenteAtual.status.pv === "")) {
-      pvEl.value = pvTotal;
+      pvEl.value = pvTotal > 0 ? pvTotal : "";
       agenteAtual.status.pv = pvTotal;
-      if (deveSalvarNuvem) atualizarCampoDebounced("status", "pv", pvTotal);
+      if (deveSalvarNuvem && pvTotal > 0) atualizarCampoDebounced("status", "pv", pvTotal);
     }
 
-    // 2. PD Máximo: ((Inteligência + Sabedoria) / 5) + Humanidade Inicial (Regra Oficial pág. 32)
+    // 2. PD Máximo: ((Inteligência + Sabedoria) / 5) + Humanidade Inicial (Regra Oficial pág. 31)
     const int = parseInt(agenteAtual.atributos?.inteligencia) || 0;
     const sab = parseInt(agenteAtual.atributos?.sabedoria) || 0;
-    const hum = parseInt(agenteAtual.atributos?.humanidade) || 0;
-    const pdMaxBase = Math.floor((int + sab) / 5) + hum;
+    const humAtual = parseInt(agenteAtual.atributos?.humanidade) || 0;
+    if (!agenteAtual.atributos.humanidade_inicial && humAtual > 0) {
+      agenteAtual.atributos.humanidade_inicial = humAtual;
+      if (deveSalvarNuvem) atualizarCampoDebounced("atributos", "humanidade_inicial", humAtual);
+    }
+    const humInicial = parseInt(agenteAtual.atributos?.humanidade_inicial) || humAtual;
+    const pdMaxBase = Math.floor((int + sab) / 5) + humInicial;
     const pdMaxEl = document.getElementById("status-pd_max");
 
-    // Delta Inteligente para PD:
-    let pdMod = 0;
-    if (agenteAtual.status.pd_max_mod !== undefined && agenteAtual.status.pd_max_mod !== null) {
-      pdMod = Number(agenteAtual.status.pd_max_mod) || 0;
-    } else if (agenteAtual.status.pd_max && Number(agenteAtual.status.pd_max) > 0) {
-      pdMod = Number(agenteAtual.status.pd_max) - pdMaxBase;
-      agenteAtual.status.pd_max_mod = pdMod;
+    let pdMod = Number(agenteAtual.status.pd_max_mod) || 0;
+    // Auto-cura do bug de delta residual
+    if (pdMaxBase > 1 && pdMod === (1 - pdMaxBase)) {
+      pdMod = 0;
+      agenteAtual.status.pd_max_mod = 0;
     }
-    const pdTotal = Math.max(1, pdMaxBase + pdMod);
+
+    const pdTotal = pdMaxBase > 0 ? Math.max(1, pdMaxBase + pdMod) : (pdMod > 0 ? pdMod : 0);
     agenteAtual.status.pd_max = pdTotal;
 
     if (pdMaxEl) {
       const textoModPd = pdMod !== 0 ? ` | Modificador permanente: ${pdMod > 0 ? "+" : ""}${pdMod}` : "";
       pdMaxEl.title = `PD Máximo: ${pdTotal} (Base atributos: ${pdMaxBase}${textoModPd}. Editável manualmente)`;
-      if (document.activeElement !== pdMaxEl && String(pdMaxEl.value) !== String(pdTotal)) {
-        pdMaxEl.value = pdTotal;
+      if (document.activeElement !== pdMaxEl) {
+        pdMaxEl.value = pdTotal > 0 ? pdTotal : "";
       }
     }
     if (deveSalvarNuvem) {
       atualizarCampoDebounced("status", "pd_max", pdTotal);
-      if (pdMod !== 0) atualizarCampoDebounced("status", "pd_max_mod", pdMod);
+      atualizarCampoDebounced("status", "pd_max_mod", pdMod);
     }
 
     // Se PD atual estiver vazio ou indefinido, inicializa com o PD Máximo
     const pdEl = document.getElementById("status-pd");
     if (pdEl && (agenteAtual.status.pd === undefined || agenteAtual.status.pd === null || agenteAtual.status.pd === "")) {
-      pdEl.value = pdTotal;
+      pdEl.value = pdTotal > 0 ? pdTotal : "";
       agenteAtual.status.pd = pdTotal;
-      if (deveSalvarNuvem) atualizarCampoDebounced("status", "pd", pdTotal);
+      if (deveSalvarNuvem && pdTotal > 0) atualizarCampoDebounced("status", "pd", pdTotal);
     }
 
     // 3. Dano Bônus (DB): Força + Corpo (Regra Oficial pág. 32)
@@ -4277,8 +4304,8 @@ if (formFicha) {
         } else {
           const int = parseInt(agenteAtual.atributos?.inteligencia) || 0;
           const sab = parseInt(agenteAtual.atributos?.sabedoria) || 0;
-          const hum = parseInt(agenteAtual.atributos?.humanidade) || 0;
-          const base = Math.floor((int + sab) / 5) + hum;
+          const humIni = parseInt(agenteAtual.atributos?.humanidade_inicial) || parseInt(agenteAtual.atributos?.humanidade) || 0;
+          const base = Math.floor((int + sab) / 5) + humIni;
           const mod = valNum > 0 ? (valNum - base) : 0;
           agenteAtual.status.pd_max = valNum > 0 ? valNum : base;
           agenteAtual.status.pd_max_mod = mod;
@@ -4301,6 +4328,10 @@ if (formFicha) {
       agenteAtual[categoria][chave] = valorTratado;
 
       if (categoria === "atributos") {
+        if (chave === "humanidade" && !agenteAtual.atributos.humanidade_inicial && valorTratado > 0) {
+          agenteAtual.atributos.humanidade_inicial = valorTratado;
+          atualizarCampoDebounced("atributos", "humanidade_inicial", valorTratado);
+        }
         atualizarCalculosAutomaticos(true);
       }
 
@@ -4328,7 +4359,7 @@ if (formFicha) {
             const vig = parseInt(agenteAtual.atributos?.vigor) || 0;
             const cor = parseInt(agenteAtual.atributos?.corpo) || 0;
             const base = Math.floor((vig + cor) / 5);
-            elemento.value = base;
+            elemento.value = base > 0 ? base : "";
             agenteAtual.status.pv_max = base;
             agenteAtual.status.pv_max_mod = 0;
             elemento.title = `PV Máximo: ${base} (Calculado pelos atributos: ${base})`;
@@ -4338,9 +4369,9 @@ if (formFicha) {
           } else {
             const int = parseInt(agenteAtual.atributos?.inteligencia) || 0;
             const sab = parseInt(agenteAtual.atributos?.sabedoria) || 0;
-            const hum = parseInt(agenteAtual.atributos?.humanidade) || 0;
-            const base = Math.floor((int + sab) / 5) + hum;
-            elemento.value = base;
+            const humIni = parseInt(agenteAtual.atributos?.humanidade_inicial) || parseInt(agenteAtual.atributos?.humanidade) || 0;
+            const base = Math.floor((int + sab) / 5) + humIni;
+            elemento.value = base > 0 ? base : "";
             agenteAtual.status.pd_max = base;
             agenteAtual.status.pd_max_mod = 0;
             elemento.title = `PD Máximo: ${base} (Calculado pelos atributos: ${base})`;
