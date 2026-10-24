@@ -267,7 +267,8 @@ select:focus {
 .level-table legend,
 .section-title,
 .skill-column h3,
-.boxed-area > span {
+.boxed-area > span,
+.boxed-area-header-flex > span {
   font-family: Georgia, "Times New Roman", serif;
   font-weight: 900;
   text-transform: uppercase;
@@ -791,7 +792,8 @@ input[type="number"]::-webkit-outer-spin-button {
   gap: 10px;
 }
 
-.boxed-area > span {
+.boxed-area > span,
+.boxed-area-header-flex > span {
   display: block;
   text-align: center;
   font-size: 21px;
@@ -2116,10 +2118,24 @@ body.dark-theme #modal-selecao-filter {
 
 /* Header Flex para caixas interativas com botão de Texto antigo */
 .boxed-area-header-flex {
+  position: relative;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   width: 100%;
+}
+
+.boxed-area-header-flex > span {
+  display: block;
+  text-align: center;
+  margin: 0 auto;
+}
+
+.boxed-area-header-flex .btn-texto-antigo {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .btn-texto-antigo {
