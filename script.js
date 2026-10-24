@@ -653,11 +653,6 @@ function normalizarAgente(agente) {
   if (!combinado.status) combinado.status = {};
   if (combinado.status.pv_max_mod === undefined || combinado.status.pv_max_mod === null) combinado.status.pv_max_mod = 0;
   if (combinado.status.pd_max_mod === undefined || combinado.status.pd_max_mod === null) combinado.status.pd_max_mod = 0;
-  if (!combinado.atributos) combinado.atributos = {};
-  if (!combinado.atributos.humanidade_inicial && combinado.atributos.humanidade) {
-    combinado.atributos.humanidade_inicial = combinado.atributos.humanidade;
-  }
-
   const vigNorm = parseInt(combinado.atributos?.vigor) || 0;
   const corNorm = parseInt(combinado.atributos?.corpo) || 0;
   const basePvNorm = Math.floor((vigNorm + corNorm) / 5);
@@ -667,8 +662,7 @@ function normalizarAgente(agente) {
 
   const intNorm = parseInt(combinado.atributos?.inteligencia) || 0;
   const sabNorm = parseInt(combinado.atributos?.sabedoria) || 0;
-  const humIniNorm = parseInt(combinado.atributos?.humanidade_inicial) || parseInt(combinado.atributos?.humanidade) || 0;
-  const basePdNorm = Math.floor((intNorm + sabNorm) / 5) + humIniNorm;
+  const basePdNorm = Math.floor((intNorm + sabNorm) / 5);
   if (basePdNorm > 1 && combinado.status.pd_max_mod === (1 - basePdNorm)) {
     combinado.status.pd_max_mod = 0;
   }
@@ -1902,16 +1896,10 @@ if (formFicha) {
       if (deveSalvarNuvem && pvTotal > 0) atualizarCampoDebounced("status", "pv", pvTotal);
     }
 
-    // 2. PD Máximo: ((Inteligência + Sabedoria) / 5) + Humanidade Inicial (Regra Oficial pág. 31)
+    // 2. PD Máximo: (Inteligência + Sabedoria) / 5 (Regra Oficial pág. 31 - Humanidade ajustada manualmente na ficha)
     const int = parseInt(agenteAtual.atributos?.inteligencia) || 0;
     const sab = parseInt(agenteAtual.atributos?.sabedoria) || 0;
-    const humAtual = parseInt(agenteAtual.atributos?.humanidade) || 0;
-    if (!agenteAtual.atributos.humanidade_inicial && humAtual > 0) {
-      agenteAtual.atributos.humanidade_inicial = humAtual;
-      if (deveSalvarNuvem) atualizarCampoDebounced("atributos", "humanidade_inicial", humAtual);
-    }
-    const humInicial = parseInt(agenteAtual.atributos?.humanidade_inicial) || humAtual;
-    const pdMaxBase = Math.floor((int + sab) / 5) + humInicial;
+    const pdMaxBase = Math.floor((int + sab) / 5);
     const pdMaxEl = document.getElementById("status-pd_max");
 
     let pdMod = Number(agenteAtual.status.pd_max_mod) || 0;
@@ -4304,8 +4292,7 @@ if (formFicha) {
         } else {
           const int = parseInt(agenteAtual.atributos?.inteligencia) || 0;
           const sab = parseInt(agenteAtual.atributos?.sabedoria) || 0;
-          const humIni = parseInt(agenteAtual.atributos?.humanidade_inicial) || parseInt(agenteAtual.atributos?.humanidade) || 0;
-          const base = Math.floor((int + sab) / 5) + humIni;
+          const base = Math.floor((int + sab) / 5);
           const mod = valNum > 0 ? (valNum - base) : 0;
           agenteAtual.status.pd_max = valNum > 0 ? valNum : base;
           agenteAtual.status.pd_max_mod = mod;
@@ -4328,11 +4315,9 @@ if (formFicha) {
       agenteAtual[categoria][chave] = valorTratado;
 
       if (categoria === "atributos") {
-        if (chave === "humanidade" && !agenteAtual.atributos.humanidade_inicial && valorTratado > 0) {
-          agenteAtual.atributos.humanidade_inicial = valorTratado;
-          atualizarCampoDebounced("atributos", "humanidade_inicial", valorTratado);
+        if (chave !== "humanidade" && chave !== "carisma") {
+          atualizarCalculosAutomaticos(true);
         }
-        atualizarCalculosAutomaticos(true);
       }
 
       // Envia APENAS o campo específico para a nuvem para não apagar edições de outros (ex: Mestre)
@@ -4369,8 +4354,7 @@ if (formFicha) {
           } else {
             const int = parseInt(agenteAtual.atributos?.inteligencia) || 0;
             const sab = parseInt(agenteAtual.atributos?.sabedoria) || 0;
-            const humIni = parseInt(agenteAtual.atributos?.humanidade_inicial) || parseInt(agenteAtual.atributos?.humanidade) || 0;
-            const base = Math.floor((int + sab) / 5) + humIni;
+            const base = Math.floor((int + sab) / 5);
             elemento.value = base > 0 ? base : "";
             agenteAtual.status.pd_max = base;
             agenteAtual.status.pd_max_mod = 0;
