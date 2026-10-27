@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ficha do Agente - Protocolo Miragem</title>
-    <link rel="stylesheet" href="style.css?v=24" />
+    <link rel="stylesheet" href="style.css?v=32" />
   </head>
   <body class="ficha-body">
     <!-- Botão Flutuante de Modo Escuro Minimalista -->
@@ -99,7 +99,7 @@
                     type="number"
                     id="status-pv_max"
                     style="text-align: left; padding-left: 10px"
-                    title="Máximo"
+                    title="PV Máximo (Base pelos atributos: (Vigor + Corpo) / 5. Editável manualmente)"
                     placeholder="0"
                   />
                 </div>
@@ -127,7 +127,7 @@
                     type="number"
                     id="status-pd_max"
                     style="text-align: left; padding-left: 10px"
-                    title="Máximo"
+                    title="PD Máximo (Base pelos atributos: (Inteligência + Sabedoria) / 5. Editável manualmente)"
                     placeholder="0"
                   />
                 </div>
@@ -1453,7 +1453,10 @@
               <textarea id="perfil-personalidade" rows="8"></textarea>
             </div>
             <div class="boxed-area trauma-box">
-              <span>FOBIAS, MANIAS, FERIMENTOS E MALDIÇÕES</span>
+              <div class="boxed-area-header-flex">
+                <span>FOBIAS, MANIAS, FERIMENTOS E MALDIÇÕES</span>
+                <button type="button" class="btn-texto-antigo" onclick="window.abrirModalTextoAntigo('traumas')" title="Ver texto original das anotações">Texto antigo</button>
+              </div>
               <div id="traumas-clinicos-container" class="interactive-container"></div>
               <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
                 <button type="button" id="btn-add-fobia" class="interactive-add-btn" style="margin-top:0; font-size: 11px;">+ Fobia</button>
@@ -1461,7 +1464,6 @@
                 <button type="button" id="btn-add-ferimento" class="interactive-add-btn" style="margin-top:0; font-size: 11px;">+ Ferimento</button>
                 <button type="button" id="btn-add-maldicao" class="interactive-add-btn" style="margin-top:0; font-size: 11px;">+ Maldição</button>
               </div>
-            </div>
             </div>
           </div>
 
@@ -1475,29 +1477,47 @@
               <input type="text" id="recursos-salario" />
             </label>
             <div class="boxed-area equipment-box">
-              <span>EQUIPAMENTOS</span>
-              <textarea id="inventario-equipamentos" rows="10"></textarea>
+              <div class="boxed-area-header-flex">
+                <span>EQUIPAMENTOS</span>
+                <button type="button" class="btn-texto-antigo" onclick="window.abrirModalTextoAntigo('equipamentos')" title="Ver texto original das anotações">Texto antigo</button>
+              </div>
+              <div id="inventario-equipamentos-lista" class="interactive-container"></div>
+              <button type="button" id="btn-add-equipamento" class="interactive-add-btn">+ Equipamento</button>
             </div>
             <div class="boxed-area goods-box">
-              <span>BENS MATERIAIS</span>
-              <textarea id="recursos-bens_materiais" rows="10"></textarea>
+              <div class="boxed-area-header-flex">
+                <span>BENS MATERIAIS</span>
+                <button type="button" class="btn-texto-antigo" onclick="window.abrirModalTextoAntigo('bens')" title="Ver texto original das anotações">Texto antigo</button>
+              </div>
+              <div id="recursos-bens_materiais-lista" class="interactive-container"></div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <button type="button" id="btn-add-moradia" class="interactive-add-btn" style="margin-top:0;">+ Moradia</button>
+                <button type="button" id="btn-add-veiculo" class="interactive-add-btn" style="margin-top:0;">+ Veículo</button>
+              </div>
             </div>
             <div class="load-matrix">
               <label
                 ><span>CARGA LEVE:</span
-                ><input type="text" id="recursos-carga_leve"
+                ><input type="text" id="recursos-carga_leve" readonly
               /></label>
               <label
                 ><span>CARGA MODERADA:</span
-                ><input type="text" id="recursos-carga_moderada"
+                ><input type="text" id="recursos-carga_moderada" readonly
               /></label>
               <label
                 ><span>CARGA MÁXIMA:</span
-                ><input type="text" id="recursos-carga_maxima"
+                ><input type="text" id="recursos-carga_maxima" readonly
               /></label>
               <label
-                ><span>PESO TOTAL:</span><input type="text" id="inventario-peso"
+                ><span>PESO TOTAL:</span><input type="text" id="inventario-peso" readonly
               /></label>
+            </div>
+            <div id="carga-penalidade-panel" class="carga-penalidade-panel">
+              <div class="carga-badge carga-leve" id="carga-status-badge">CARGA LEVE</div>
+              <div class="carga-detalhes">
+                <span id="carga-penalidade-text">Sem penalidades.</span>
+                <span id="carga-deslocamento-text" class="carga-deslocamento-tag">Deslocamento: 6.0m</span>
+              </div>
             </div>
           </div>
 
@@ -1509,21 +1529,25 @@
 
         <section class="sheet-page page-four">
           <div class="boxed-area attacks-box">
-            <span>DESCRIÇÃO DOS EQUIPAMENTOS E ATAQUES:</span>
-            <textarea id="inventario-descricao" rows="10"></textarea>
+            <span>ARMAS</span>
+            <div id="inventario-armas-lista" class="interactive-container"></div>
+            <button type="button" id="btn-add-arma" class="interactive-add-btn">+ Arma</button>
           </div>
 
           <div class="combat-strip">
-            <label><span>RD:</span><textarea id="combate-rd" style="border: 0; padding: 4px; resize: vertical; height: 100%; min-height: 38px;"></textarea></label>
+            <label><span>RD:</span><input type="text" id="combate-rd" readonly title="Redução de Dano calculada automaticamente a partir das vestimentas e proteções no inventário" /></label>
             <label
-              ><span>DEFESA:</span><input type="text" id="combate-defesa"
+              ><span>DEFESA:</span><input type="text" id="combate-defesa" readonly title="Defesa Passiva calculada automaticamente: Agilidade / 20 (+ bônus de equipamentos)"
             /></label>
-            <label><span>DB:</span><input type="text" id="combate-db" /></label>
+            <label><span>DB:</span><input type="text" id="combate-db" readonly title="Dano Bônus calculado automaticamente com base na soma de Força + Corpo" /></label>
           </div>
 
           <div class="page-four-grid">
             <div class="boxed-area abilities-box">
-              <span>HABILIDADES & PODERES</span>
+              <div class="boxed-area-header-flex">
+                <span>HABILIDADES & PODERES</span>
+                <button type="button" class="btn-texto-antigo" onclick="window.abrirModalTextoAntigo('habilidades')" title="Ver texto original das anotações">Texto antigo</button>
+              </div>
               <div id="habilidades-lista-container" class="interactive-container"></div>
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                 <button type="button" id="btn-add-habilidade" class="interactive-add-btn" style="margin-top:0;">+ Habilidade</button>
@@ -1584,7 +1608,10 @@
           </div>
 
           <div class="boxed-area rituals-box">
-            <span>RITUAIS</span>
+            <div class="boxed-area-header-flex">
+              <span>RITUAIS</span>
+              <button type="button" class="btn-texto-antigo" onclick="window.abrirModalTextoAntigo('rituais')" title="Ver texto original das anotações">Texto antigo</button>
+            </div>
             <div id="habilidades-rituais-lista" class="interactive-container"></div>
             <button type="button" id="btn-add-ritual" class="interactive-add-btn">+ Adicionar Ritual</button>
           </div>
@@ -1678,6 +1705,33 @@
       </div>
     </div>
 
-    <script type="module" src="script.js?v=42"></script>
+    <!-- Modal para Visualizar Texto Antigo -->
+    <div id="modal-texto-antigo" class="modal-overlay hidden">
+      <div class="modal-content" style="max-width: 650px;">
+        <div class="modal-header">
+          <span id="modal-texto-antigo-titulo" class="modal-title">Texto antigo</span>
+          <button type="button" id="modal-texto-antigo-close" class="modal-close">&times;</button>
+        </div>
+        <div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; gap: 8px; border-bottom: 1px solid var(--line); padding-bottom: 8px; flex-wrap: wrap;">
+            <button type="button" class="tab-btn-texto-antigo active" data-tab="habilidades">Habilidades & Poderes</button>
+            <button type="button" class="tab-btn-texto-antigo" data-tab="equipamentos">Equipamentos</button>
+            <button type="button" class="tab-btn-texto-antigo" data-tab="traumas">Traumas Clínicos</button>
+            <button type="button" class="tab-btn-texto-antigo" data-tab="rituais">Rituais</button>
+            <button type="button" class="tab-btn-texto-antigo" data-tab="bens">Bens Materiais</button>
+          </div>
+          <p style="margin: 0; font-size: 11px; color: var(--muted); font-style: italic;">
+            Este é o registro das anotações originais salvas na ficha. Você pode visualizar e copiar o conteúdo abaixo.
+          </p>
+          <textarea id="modal-texto-antigo-conteudo" readonly style="width: 100%; height: 260px; font-family: monospace; font-size: 12px; padding: 10px; box-sizing: border-box; resize: vertical;"></textarea>
+          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;">
+            <button type="button" id="modal-texto-antigo-copiar" class="btn-dark" style="background: #333; border-color: #333;">Copiar texto</button>
+            <button type="button" id="modal-texto-antigo-fechar" class="btn-dark">Fechar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="script.js?v=61"></script>
   </body>
 </html>

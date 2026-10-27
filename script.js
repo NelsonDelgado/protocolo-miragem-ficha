@@ -25,7 +25,7 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-import { REGRAS } from "./regras.js?v=30";
+import { REGRAS } from "./regras.js?v=33";
 
 const firebaseConfig = {
   // Dados de autenticacao firebase
@@ -119,12 +119,13 @@ function criarAgenteEmBranco(nomeInicial) {
       aumento_atributo_cura: "",
       total_niveis: "",
     },
-    status: { pv: 0, pv_max: 0, pd: 0, pd_max: 0, gc: 50 },
+    status: { pv: 0, pv_max: 0, pd: 0, pd_max: 0, gc: 50, pv_max_mod: 0, pd_max_mod: 0 },
     atributos: {
       forca: 0,
       inteligencia: 0,
       carisma: 0,
       humanidade: 0,
+      humanidade_inicial: 0,
       vigor: 0,
       corpo: 0,
       sabedoria: 0,
@@ -261,7 +262,7 @@ function criarAgenteEmBranco(nomeInicial) {
       carga_moderada: "",
       carga_maxima: "",
     },
-    inventario: { carga: 0, peso: "", equipamentos: [], descricao: "" },
+    inventario: { carga: 0, peso: "", equipamentos: [], armas: [], descricao: "" },
     combate: { rd: "", defesa: "", db: "" },
     habilidades: {
       lista: [],
@@ -292,42 +293,391 @@ function combinarEstruturaPadrao(padrao, agente) {
   return combinado;
 }
 
+function sanitizarParaFirestore(val) {
+  if (val === undefined) return null;
+  if (val === null || typeof val !== "object") return val;
+  if (Array.isArray(val)) {
+    return val
+      .map(v => (v === undefined ? null : sanitizarParaFirestore(v)))
+      .filter(v => v !== undefined);
+  }
+  const limpo = {};
+  Object.keys(val).forEach(k => {
+    const v = val[k];
+    if (v !== undefined) {
+      limpo[k] = sanitizarParaFirestore(v);
+    }
+  });
+  return limpo;
+}
+
+function normalizarTextoParaBusca(str) {
+  if (!str) return "";
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function detectarEHealarHabilidadesFragmentadas(lista) {
+  if (!Array.isArray(lista) || lista.length < 2) return null;
+
+  let temSeparador = false;
+  let itemsMesmoNomeEDesc = 0;
+  let frasesQuebradas = 0;
+
+  lista.forEach(item => {
+    const nome = (item?.nome || "").trim();
+    const desc = (item?.descricao || "").trim();
+    if (nome.includes("---") || nome.includes("===") || nome.includes("___")) {
+      temSeparador = true;
+    }
+    if (desc && nome.toLowerCase() === desc.toLowerCase()) {
+      itemsMesmoNomeEDesc++;
+    }
+    if (/^[a-zà-ÿ]/.test(nome)) {
+      frasesQuebradas++;
+    }
+  });
+
+  const ehFragmentado = temSeparador || (itemsMesmoNomeEDesc >= 2 && itemsMesmoNomeEDesc / lista.length >= 0.4) || (frasesQuebradas >= 2);
+  if (!ehFragmentado) return null;
+
+  // Remontar o texto original unindo os fragmentos
+  const linhas = lista.map(item => {
+    if (typeof item === "string") return item;
+    return item?.nome || item?.descricao || "";
+  }).filter(Boolean);
+
+  return linhas.join("\n");
+}
+
+function parsearHabilidadesLegadas(raw) {
+  if (!raw || typeof raw !== "string") return [];
+
+  const catalog = [...(REGRAS.habilidades || []), ...(REGRAS.poderes || [])];
+
+  // Normalizar divisores de 3 ou mais traços, iguais ou sublinhados
+  const textoComMarcadores = raw.replace(/\s*[-=_*]{3,}\s*/g, "\n@@BLOCO_SEP@@\n");
+  const blocosBrutos = textoComMarcadores.split(/(?:\r?\n\s*\r?\n+)|\n?@@BLOCO_SEP@@\n?/);
+
+  const resultado = [];
+
+  blocosBrutos.forEach((bloco, idx) => {
+    const limpo = bloco.trim();
+    if (!limpo) return;
+
+    const linhas = limpo.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (linhas.length === 0) return;
+
+    let cabecalho = linhas[0];
+    let descricao = linhas.slice(1).join(" ");
+
+    // Se só tem uma linha e tem dois pontos: "Nome: Descrição"
+    if (linhas.length === 1 && cabecalho.includes(":")) {
+      const idxDoisPontos = cabecalho.indexOf(":");
+      descricao = cabecalho.slice(idxDoisPontos + 1).trim();
+      cabecalho = cabecalho.slice(0, idxDoisPontos).trim();
+    }
+
+    // Limpar marcadores de lista no cabeçalho (ex: "- ", "• ", "1. ")
+    cabecalho = cabecalho.replace(/^[-•*]\s*/, "").replace(/^\d+[\.\-\)]\s*/, "").trim();
+
+    // Extrair possível custo embutido no título (ex: "ARTE DO VÉU - 1 DE GC" ou "Ataque Furtivo (1 PD)")
+    let custo = "-";
+    let nomeHabilidade = cabecalho;
+
+    const matchCustoParenteses = cabecalho.match(/\(([^)]*(?:PD|GC|PV|PE)[^)]*)\)/i);
+    if (matchCustoParenteses) {
+      custo = matchCustoParenteses[1].trim();
+      nomeHabilidade = cabecalho.replace(matchCustoParenteses[0], "").trim();
+    } else {
+      const matchCustoTraco = cabecalho.match(/\s*[-–—:]\s*([0-9]+\s*(?:DE\s*)?(?:PD|GC|PV|PE)[^)]*)$/i);
+      if (matchCustoTraco) {
+        custo = matchCustoTraco[1].trim();
+        nomeHabilidade = cabecalho.replace(matchCustoTraco[0], "").trim();
+      }
+    }
+
+    // Tentar correspondência oficial nas REGRAS
+    const nomeNorm = normalizarTextoParaBusca(nomeHabilidade);
+    const oficial = catalog.find(item => {
+      const itemNorm = normalizarTextoParaBusca(item.nome);
+      return itemNorm === nomeNorm || (nomeNorm.length > 5 && itemNorm.includes(nomeNorm));
+    });
+
+    if (oficial) {
+      const isPoder = oficial.type === "poder" || oficial.vertente !== undefined;
+      resultado.push({
+        id: Date.now() + idx,
+        nome: oficial.nome,
+        tipo: isPoder ? "poder" : "habilidade",
+        categoria: oficial.categoria || "Geral",
+        vertente: oficial.vertente || "Uncanny",
+        custo: custo !== "-" ? custo : (oficial.custo || "-"),
+        requisito: oficial.requisito || "-",
+        afinidade: oficial.afinidade || "",
+        afinidadeAtiva: false,
+        descricao: descricao || oficial.descricao || ""
+      });
+    } else {
+      resultado.push({
+        id: Date.now() + idx,
+        nome: nomeHabilidade || `Habilidade ${idx + 1}`,
+        tipo: "habilidade",
+        categoria: "Geral",
+        custo: custo,
+        requisito: "-",
+        descricao: descricao || cabecalho
+      });
+    }
+  });
+
+  return resultado;
+}
+
+function parsearEquipamentosLegados(raw) {
+  if (!raw || typeof raw !== "string") return { equipamentos: [], armas: [] };
+
+  const catalogArmas = REGRAS.armas || [];
+  const catalogGerais = [
+    ...(REGRAS.equipamentosGerais || []),
+    ...(REGRAS.vestimentas || []),
+    ...(REGRAS.explosivos || []),
+    ...(REGRAS.equipamentosVeu || [])
+  ];
+
+  const linhas = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const equipamentos = [];
+  const armas = [];
+
+  linhas.forEach((linha, idx) => {
+    let texto = linha.replace(/^[-•*]\s*/, "").trim();
+    if (!texto || /^[-=_*]{3,}$/.test(texto)) return;
+
+    let qtd = 1;
+    const matchQtdInicio = texto.match(/^(\d+)\s*[xX]\s+(.+)/);
+    if (matchQtdInicio) {
+      qtd = parseInt(matchQtdInicio[1], 10) || 1;
+      texto = matchQtdInicio[2].trim();
+    } else {
+      const matchQtdFim = texto.match(/\s*[xX](\d+)$/);
+      if (matchQtdFim) {
+        qtd = parseInt(matchQtdFim[1], 10) || 1;
+        texto = texto.replace(matchQtdFim[0], "").trim();
+      }
+    }
+
+    let peso = 0;
+    const matchPeso = texto.match(/[-–—(]\s*([0-9]+(?:[\.,][0-9]+)?)\s*k?g\s*\)?/i);
+    if (matchPeso) {
+      peso = parseFloat(matchPeso[1].replace(",", ".")) || 0;
+      texto = texto.replace(matchPeso[0], "").trim();
+    }
+
+    texto = texto.replace(/[-–—:]$/, "").trim();
+
+    const nomeNorm = normalizarTextoParaBusca(texto);
+    const armaOficial = catalogArmas.find(a => {
+      const aNorm = normalizarTextoParaBusca(a.nome);
+      return aNorm === nomeNorm || (nomeNorm.length > 4 && aNorm.includes(nomeNorm));
+    });
+
+    if (armaOficial) {
+      armas.push({
+        id: Date.now() + idx,
+        nome: armaOficial.nome,
+        tipo: armaOficial.tipo || "Arma",
+        categoria: armaOficial.categoria || "Geral",
+        dano: armaOficial.dano || "1d6",
+        critico: armaOficial.critico || "x2",
+        alcance: armaOficial.alcance || "Curto",
+        peso: armaOficial.peso !== undefined ? armaOficial.peso : (peso || 1),
+        espaco: armaOficial.espaco || 1,
+        munAtual: armaOficial.munMax || 0,
+        munMax: armaOficial.munMax || 0,
+        pentes: armaOficial.munMax > 0 ? 1 : 0,
+        descricao: armaOficial.descricao || ""
+      });
+      return;
+    }
+
+    const eqOficial = catalogGerais.find(g => {
+      const gNorm = normalizarTextoParaBusca(g.nome);
+      return gNorm === nomeNorm || (nomeNorm.length > 4 && gNorm.includes(nomeNorm));
+    });
+
+    if (eqOficial) {
+      equipamentos.push({
+        id: Date.now() + idx,
+        nome: eqOficial.nome,
+        tipo: eqOficial.category || eqOficial.tipo || "Equipamento",
+        peso: eqOficial.peso !== undefined ? eqOficial.peso : peso,
+        qtd: qtd,
+        espaco: eqOficial.espaco || 1,
+        descricao: eqOficial.descricao || ""
+      });
+      return;
+    }
+
+    equipamentos.push({
+      id: Date.now() + idx,
+      nome: texto,
+      tipo: "Equipamento",
+      peso: peso,
+      qtd: qtd,
+      descricao: ""
+    });
+  });
+
+  return { equipamentos, armas };
+}
+
+function parsearTraumasLegados(raw) {
+  if (!raw || typeof raw !== "string") return [];
+  const linhas = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const resultado = [];
+
+  linhas.forEach((linha, idx) => {
+    let texto = linha.replace(/^[-•*]\s*/, "").trim();
+    if (!texto || /^[-=_*]{3,}$/.test(texto)) return;
+
+    let tipo = "fobia";
+    let nome = texto;
+    let efeito = "";
+
+    const matchTipo = texto.match(/^\[?(Fobia|Mania|Ferimento|Maldição|Maldicao)\]?[:\s-]+(.*)/i);
+    if (matchTipo) {
+      const tipoDetectado = matchTipo[1].toLowerCase();
+      if (tipoDetectado.includes("mania")) tipo = "mania";
+      else if (tipoDetectado.includes("ferimento")) tipo = "ferimento";
+      else if (tipoDetectado.includes("maldic")) tipo = "maldicao";
+      else tipo = "fobia";
+      texto = matchTipo[2].trim();
+    }
+
+    if (texto.includes(":")) {
+      const partes = texto.split(/:\s*(.+)/);
+      nome = partes[0].trim();
+      efeito = partes[1] ? partes[1].trim() : "";
+    } else if (texto.includes(" - ")) {
+      const partes = texto.split(/\s+-\s+(.+)/);
+      nome = partes[0].trim();
+      efeito = partes[1] ? partes[1].trim() : "";
+    } else {
+      nome = texto;
+    }
+
+    resultado.push({
+      id: Date.now() + idx,
+      nome: nome,
+      tipo: tipo,
+      efeito: efeito
+    });
+  });
+
+  return resultado;
+}
+
+function parsearRituaisLegados(raw) {
+  if (!raw || typeof raw !== "string") return [];
+  const catalog = REGRAS.rituais || [];
+  const textoComMarcadores = raw.replace(/\s*[-=_*]{3,}\s*/g, "\n@@BLOCO_SEP@@\n");
+  const blocos = textoComMarcadores.split(/(?:\r?\n\s*\r?\n+)|\n?@@BLOCO_SEP@@\n?/);
+  const resultado = [];
+
+  blocos.forEach((bloco, idx) => {
+    const limpo = bloco.trim();
+    if (!limpo) return;
+    const linhas = limpo.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (linhas.length === 0) return;
+
+    let cabecalho = linhas[0].replace(/^[-•*]\s*/, "").trim();
+    let desc = linhas.slice(1).join(" ");
+
+    if (linhas.length === 1 && cabecalho.includes(":")) {
+      const p = cabecalho.split(/:\s*(.+)/);
+      cabecalho = p[0].trim();
+      desc = p[1] ? p[1].trim() : "";
+    }
+
+    const nomeNorm = normalizarTextoParaBusca(cabecalho);
+    const oficial = catalog.find(r => {
+      const rNorm = normalizarTextoParaBusca(r.nome);
+      return rNorm === nomeNorm || (nomeNorm.length > 4 && rNorm.includes(nomeNorm));
+    });
+
+    if (oficial) {
+      resultado.push({
+        id: Date.now() + idx,
+        nome: oficial.nome,
+        circulo: oficial.circulo || "1º Círculo",
+        aspecto: oficial.aspecto || "Geral",
+        custo: oficial.custo || "-",
+        alc: oficial.alc || "-",
+        target: oficial.target || "-",
+        duracao: oficial.duracao || "-",
+        resistencia: oficial.resistencia || "-",
+        condicao: oficial.condicao || "-",
+        desc: desc || oficial.desc || ""
+      });
+    } else {
+      resultado.push({
+        id: Date.now() + idx,
+        nome: cabecalho || `Ritual ${idx + 1}`,
+        circulo: "1º Círculo",
+        aspecto: "Geral",
+        custo: "-",
+        alc: "-",
+        target: "-",
+        duracao: "-",
+        resistencia: "-",
+        condicao: "-",
+        desc: desc || cabecalho
+      });
+    }
+  });
+
+  return resultado;
+}
+
 function normalizarAgente(agente) {
   const nome = agente && agente.identidade ? agente.identidade.nome : "";
   const combinado = combinarEstruturaPadrao(criarAgenteEmBranco(nome), agente || {});
 
-  // Compatibilidade retroativa com fichas antigas (onde campos eram texto puro ou arrays de strings):
-  
+  // Preservar texto_antigo já existente na ficha para não perder dados originais
+  if (agente?.habilidades?.texto_antigo) combinado.habilidades.texto_antigo = agente.habilidades.texto_antigo;
+  if (agente?.inventario?.texto_antigo) combinado.inventario.texto_antigo = agente.inventario.texto_antigo;
+  if (agente?.perfil?.traumas_antigo) combinado.perfil.traumas_antigo = agente.perfil.traumas_antigo;
+  if (agente?.habilidades?.rituais_antigo) combinado.habilidades.rituais_antigo = agente.habilidades.rituais_antigo;
+  if (agente?.recursos?.bens_antigo) combinado.recursos.bens_antigo = agente.recursos.bens_antigo;
+
+  // Normalização de status e cura de modificadores residuais corrompidos
+  if (!combinado.status) combinado.status = {};
+  if (combinado.status.pv_max_mod === undefined || combinado.status.pv_max_mod === null) combinado.status.pv_max_mod = 0;
+  if (combinado.status.pd_max_mod === undefined || combinado.status.pd_max_mod === null) combinado.status.pd_max_mod = 0;
+  const vigNorm = parseInt(combinado.atributos?.vigor) || 0;
+  const corNorm = parseInt(combinado.atributos?.corpo) || 0;
+  const basePvNorm = Math.floor((vigNorm + corNorm) / 5);
+  if (basePvNorm > 1 && combinado.status.pv_max_mod === (1 - basePvNorm)) {
+    combinado.status.pv_max_mod = 0;
+  }
+
+  const intNorm = parseInt(combinado.atributos?.inteligencia) || 0;
+  const sabNorm = parseInt(combinado.atributos?.sabedoria) || 0;
+  const basePdNorm = Math.floor((intNorm + sabNorm) / 5);
+  if (basePdNorm > 1 && combinado.status.pd_max_mod === (1 - basePdNorm)) {
+    combinado.status.pd_max_mod = 0;
+  }
+
   // 1. Traumas Clínicos (Fobias, Manias, Ferimentos, Maldições)
   if (typeof combinado.perfil?.traumas === "string") {
     const raw = combinado.perfil.traumas.trim();
-    if (raw) {
-      const linhas = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-      combinado.perfil.traumas = linhas.map((linha, idx) => {
-        const partes = linha.split(/:\s*(.+)/);
-        return {
-          id: Date.now() + idx,
-          nome: partes[0] ? partes[0].trim() : linha,
-          tipo: "fobia",
-          efeito: partes[1] ? partes[1].trim() : "",
-        };
-      });
-    } else {
-      combinado.perfil.traumas = [];
-    }
+    if (!combinado.perfil.traumas_antigo) combinado.perfil.traumas_antigo = raw;
+    combinado.perfil.traumas = parsearTraumasLegados(raw);
   } else if (Array.isArray(combinado.perfil?.traumas)) {
-    combinado.perfil.traumas = combinado.perfil.traumas.map((t, idx) => {
-      if (typeof t === "string") {
-        const partes = t.split(/:\s*(.+)/);
-        return {
-          id: Date.now() + idx,
-          nome: partes[0] ? partes[0].trim() : t,
-          tipo: "fobia",
-          efeito: partes[1] ? partes[1].trim() : "",
-        };
-      }
-      return t;
-    });
+    if (combinado.perfil.traumas.some(t => typeof t === "string")) {
+      const raw = combinado.perfil.traumas.map(t => typeof t === "string" ? t : (t.nome + ": " + t.efeito)).join("\n");
+      if (!combinado.perfil.traumas_antigo) combinado.perfil.traumas_antigo = raw;
+      combinado.perfil.traumas = parsearTraumasLegados(raw);
+    }
   } else {
     combinado.perfil.traumas = [];
   }
@@ -335,46 +685,26 @@ function normalizarAgente(agente) {
   // 2. Habilidades e Poderes
   if (typeof combinado.habilidades?.lista === "string") {
     const raw = combinado.habilidades.lista.trim();
-    if (raw) {
-      const blocos = raw.split(/\r?\n(?=[A-Za-z0-9À-ÿ])/);
-      combinado.habilidades.lista = blocos.map((bloco, idx) => {
-        const partes = bloco.split(/:\s*(.+)/s);
-        const nome = partes[0] ? partes[0].trim() : `Habilidade ${idx + 1}`;
-        const desc = partes[1] ? partes[1].trim() : bloco.trim();
-        return {
-          id: Date.now() + idx,
-          nome: nome,
-          tipo: "habilidade",
-          categoria: "Geral",
-          custo: "-",
-          requisito: "-",
-          descricao: desc,
-        };
-      });
-    } else {
-      combinado.habilidades.lista = [];
-    }
+    if (!combinado.habilidades.texto_antigo) combinado.habilidades.texto_antigo = raw;
+    combinado.habilidades.lista = parsearHabilidadesLegadas(raw);
   } else if (Array.isArray(combinado.habilidades?.lista)) {
-    combinado.habilidades.lista = combinado.habilidades.lista.map((h, idx) => {
-      if (typeof h === "string") {
-        const partes = h.split(/:\s*(.+)/s);
-        return {
-          id: Date.now() + idx,
-          nome: partes[0] ? partes[0].trim() : h,
-          tipo: "habilidade",
-          categoria: "Geral",
-          custo: "-",
-          requisito: "-",
-          descricao: partes[1] ? partes[1].trim() : h,
-        };
-      }
-      if (typeof h === "object" && h !== null) {
-        if (h.tipo === "poder") {
-          h.afinidadeAtiva = !!h.afinidadeAtiva;
+    // Detectar se a lista está fragmentada pelo bug anterior
+    const rawHeal = detectarEHealarHabilidadesFragmentadas(combinado.habilidades.lista);
+    if (rawHeal) {
+      if (!combinado.habilidades.texto_antigo) combinado.habilidades.texto_antigo = rawHeal;
+      combinado.habilidades.lista = parsearHabilidadesLegadas(rawHeal);
+    } else {
+      // Lista saudável de objetos
+      combinado.habilidades.lista = combinado.habilidades.lista.map(h => {
+        if (typeof h === "string") {
+          return { id: Date.now(), nome: h, tipo: "habilidade", categoria: "Geral", custo: "-", requisito: "-", descricao: h };
         }
-      }
-      return h;
-    });
+        if (h && typeof h === "object") {
+          if (h.tipo === "poder") h.afinidadeAtiva = !!h.afinidadeAtiva;
+        }
+        return h;
+      });
+    }
   } else {
     combinado.habilidades.lista = [];
   }
@@ -382,54 +712,102 @@ function normalizarAgente(agente) {
   // 3. Rituais
   if (typeof combinado.habilidades?.rituais === "string") {
     const raw = combinado.habilidades.rituais.trim();
-    if (raw) {
-      const blocos = raw.split(/\r?\n(?=[A-Za-z0-9À-ÿ])/);
-      combinado.habilidades.rituais = blocos.map((bloco, idx) => {
-        const partes = bloco.split(/:\s*(.+)/s);
-        const nome = partes[0] ? partes[0].trim() : `Ritual ${idx + 1}`;
-        const desc = partes[1] ? partes[1].trim() : bloco.trim();
-        return {
-          id: Date.now() + idx,
-          nome: nome,
-          circulo: "1º Círculo",
-          aspecto: "Geral",
-          custo: "-",
-          alc: "-",
-          target: "-",
-          duracao: "-",
-          resistencia: "-",
-          condicao: "-",
-          desc: desc,
-        };
-      });
-    } else {
-      combinado.habilidades.rituais = [];
-    }
+    if (!combinado.habilidades.rituais_antigo) combinado.habilidades.rituais_antigo = raw;
+    combinado.habilidades.rituais = parsearRituaisLegados(raw);
   } else if (Array.isArray(combinado.habilidades?.rituais)) {
-    combinado.habilidades.rituais = combinado.habilidades.rituais.map((r, idx) => {
-      if (typeof r === "string") {
-        const partes = r.split(/:\s*(.+)/s);
-        return {
-          id: Date.now() + idx,
-          nome: partes[0] ? partes[0].trim() : r,
-          circulo: "1º Círculo",
-          aspecto: "Geral",
-          custo: "-",
-          alc: "-",
-          target: "-",
-          duracao: "-",
-          resistencia: "-",
-          condicao: "-",
-          desc: partes[1] ? partes[1].trim() : r,
-        };
-      }
-      if (typeof r === "object" && r !== null) {
-        if (r.condicao === undefined) r.condicao = "-";
-      }
-      return r;
-    });
+    if (combinado.habilidades.rituais.some(r => typeof r === "string")) {
+      const raw = combinado.habilidades.rituais.map(r => typeof r === "string" ? r : (r.nome + ": " + (r.desc || ""))).join("\n");
+      if (!combinado.habilidades.rituais_antigo) combinado.habilidades.rituais_antigo = raw;
+      combinado.habilidades.rituais = parsearRituaisLegados(raw);
+    }
   } else {
     combinado.habilidades.rituais = [];
+  }
+
+  // 4. Inventário, Armas e Equipamentos
+  if (!combinado.inventario || typeof combinado.inventario !== "object") {
+    combinado.inventario = { carga: 0, peso: "", equipamentos: [], armas: [], descricao: "" };
+  }
+  if (!Array.isArray(combinado.inventario.armas)) {
+    combinado.inventario.armas = [];
+  }
+
+  if (typeof combinado.inventario.equipamentos === "string") {
+    const raw = combinado.inventario.equipamentos.trim();
+    if (!combinado.inventario.texto_antigo) combinado.inventario.texto_antigo = raw;
+    const { equipamentos, armas } = parsearEquipamentosLegados(raw);
+    combinado.inventario.equipamentos = equipamentos;
+    if (armas.length > 0 && combinado.inventario.armas.length === 0) {
+      combinado.inventario.armas = armas;
+    }
+  } else if (!Array.isArray(combinado.inventario.equipamentos)) {
+    combinado.inventario.equipamentos = [];
+  }
+
+  // Migrar armas antigas da lista de equipamentos apenas se armas estiver vazio
+  if (combinado.inventario.armas.length === 0 && combinado.inventario.equipamentos.length > 0) {
+    const equipamentosNaoArmas = [];
+    combinado.inventario.equipamentos.forEach(item => {
+      const isArma = item.tipo && (
+        item.tipo.toLowerCase().includes("cc") ||
+        item.tipo.toLowerCase().includes("dist") ||
+        item.tipo.toLowerCase().includes("arma") ||
+        item.tipo.toLowerCase().includes("corpo") ||
+        item.categoria?.toLowerCase().includes("arma")
+      );
+      if (isArma) {
+        if (item.pentes === undefined) item.pentes = (item.munMax > 0 ? 1 : 0);
+        combinado.inventario.armas.push(item);
+      } else {
+        equipamentosNaoArmas.push(item);
+      }
+    });
+    combinado.inventario.equipamentos = equipamentosNaoArmas;
+  } else if (combinado.inventario.armas.length > 0) {
+    // Se armas já possui itens, limpamos qualquer arma duplicada que sobrou em equipamentos
+    combinado.inventario.equipamentos = combinado.inventario.equipamentos.filter(item => {
+      const isArma = item.tipo && (
+        item.tipo.toLowerCase().includes("cc") ||
+        item.tipo.toLowerCase().includes("dist") ||
+        item.tipo.toLowerCase().includes("arma") ||
+        item.tipo.toLowerCase().includes("corpo") ||
+        item.categoria?.toLowerCase().includes("arma")
+      );
+      return !isArma;
+    });
+  }
+
+  // Deduplicar armas por ID para limpar duplicatas indesejadas
+  const armasIds = new Set();
+  combinado.inventario.armas = combinado.inventario.armas.filter(arma => {
+    const key = arma.id ? String(arma.id) : (arma.nome + "_" + arma.tipo);
+    if (armasIds.has(key)) return false;
+    armasIds.add(key);
+    if (arma.pentes === undefined) arma.pentes = (arma.munMax > 0 ? 1 : 0);
+    return true;
+  });
+
+  // 5. Bens Materiais (Moradias e Veículos)
+  if (!combinado.recursos || typeof combinado.recursos !== "object") {
+    combinado.recursos = { poupanca: "", salario: "", bens_materiais: [] };
+  }
+  if (typeof combinado.recursos.bens_materiais === "string") {
+    const raw = combinado.recursos.bens_materiais.trim();
+    if (!combinado.recursos.bens_antigo) combinado.recursos.bens_antigo = raw;
+    if (raw) {
+      const linhas = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      combinado.recursos.bens_materiais = linhas.map((linha, idx) => ({
+        id: Date.now() + idx,
+        nome: linha,
+        tipo: "moradia",
+        preco: 0,
+        upgrades: []
+      }));
+    } else {
+      combinado.recursos.bens_materiais = [];
+    }
+  } else if (!Array.isArray(combinado.recursos.bens_materiais)) {
+    combinado.recursos.bens_materiais = [];
   }
 
   return combinado;
@@ -1302,9 +1680,10 @@ const formFicha = document.getElementById("form-ficha");
 
 if (formFicha) {
   const urlParams = new URLSearchParams(window.location.search);
-  const agenteId = Number(urlParams.get("id")); // Number() lê IDs gigantes de Date.now() com mais precisão do que parseInt
+  const rawId = urlParams.get("id");
+  const agenteId = rawId && rawId !== "0" && rawId !== "null" ? rawId : null;
   const isReadOnly = urlParams.get("readonly") === "true";
-  let agenteAtual = null;
+  let agenteAtual = criarAgenteEmBranco("Agente");
   let pendingUpdates = {};
   let saveTimeoutFicha;
 
@@ -1333,7 +1712,284 @@ if (formFicha) {
     return mod;
   }
 
-  function calcularEAtualizarCargaESpeed() {
+  function calcularEAtualizarCargaESpeed(salvarNuvem = false) {
+    if (!agenteAtual) return;
+    
+    // Capacidade de Carga: calculada a partir de Corpo (ou Força como alternativa caso Corpo não esteja definido)
+    const corpoVal = parseInt(agenteAtual.atributos?.corpo);
+    const forVal = parseInt(agenteAtual.atributos?.forca);
+    let valorBaseCarga = (!isNaN(corpoVal) && corpoVal > 0) ? corpoVal : ((!isNaN(forVal) && forVal > 0) ? forVal : 0);
+
+    // Habilidade "Inventário Otimizado": usa Intelecto no lugar do atributo físico para calcular capacidade de carga
+    const temInventarioOtimizado = Array.isArray(agenteAtual.habilidades?.lista) &&
+      agenteAtual.habilidades.lista.some(h => h.id === "inventario_otimizado" || (h.nome && h.nome.toLowerCase().includes("inventário otimizado")));
+    if (temInventarioOtimizado) {
+      valorBaseCarga = parseInt(agenteAtual.atributos?.inteligencia) || 0;
+    }
+
+    // Habilidade "Mochileiro": aumenta o limite de carga em +5 kg
+    const temMochileiro = Array.isArray(agenteAtual.habilidades?.lista) &&
+      agenteAtual.habilidades.lista.some(h => h.id === "mochileiro" || (h.nome && h.nome.toLowerCase().includes("mochileiro")));
+    const bonusCarga = temMochileiro ? 5 : 0;
+
+    const cargaLeve = (valorBaseCarga / 4) + bonusCarga;
+    const cargaMod = (valorBaseCarga / 2) + bonusCarga;
+    const cargaMax = valorBaseCarga + bonusCarga;
+
+    const cargaLeveEl = document.getElementById("recursos-carga_leve");
+    const cargaModEl = document.getElementById("recursos-carga_moderada");
+    const cargaMaxEl = document.getElementById("recursos-carga_maxima");
+    const strLeve = `${cargaLeve.toFixed(1)} kg`;
+    const strMod = `${cargaMod.toFixed(1)} kg`;
+    const strMax = `${cargaMax.toFixed(1)} kg`;
+
+    if (cargaLeveEl) cargaLeveEl.value = strLeve;
+    if (cargaModEl) cargaModEl.value = strMod;
+    if (cargaMaxEl) cargaMaxEl.value = strMax;
+
+    if (!agenteAtual.recursos) agenteAtual.recursos = {};
+    agenteAtual.recursos.carga_leve = strLeve;
+    agenteAtual.recursos.carga_moderada = strMod;
+    agenteAtual.recursos.carga_maxima = strMax;
+
+    let pesoTotal = 0;
+
+    // 1. Armas, Modificações e Balas (0.01 kg por munição segundo regras oficiais pág. 74)
+    const armas = Array.isArray(agenteAtual.inventario?.armas) ? agenteAtual.inventario.armas : [];
+    armas.forEach(arma => {
+      const q = parseInt(arma.qtd) || 1;
+      const basePeso = parseFloat(arma.peso) || 0;
+      let extraPeso = 0;
+      if (Array.isArray(arma.melhorias)) {
+        arma.melhorias.forEach(melNome => {
+          const modObj = REGRAS.modificacoesArmas?.find(m => m.nome === melNome);
+          if (modObj && typeof modObj.peso === "number") extraPeso += modObj.peso;
+        });
+      }
+
+      let pesoBalas = 0;
+      const munMax = parseInt(arma.munMax) || 0;
+      if (munMax > 0) {
+        const curMun = arma.mun !== undefined ? parseInt(arma.mun) || 0 : munMax;
+        const pentes = arma.pentes !== undefined ? parseInt(arma.pentes) || 0 : 1;
+        const totalBalas = curMun + (pentes * munMax);
+        pesoBalas = totalBalas * 0.01;
+      }
+
+      pesoTotal += (basePeso + extraPeso + pesoBalas) * q;
+    });
+
+    // 2. Equipamentos Gerais
+    const eqs = Array.isArray(agenteAtual.inventario?.equipamentos) ? agenteAtual.inventario.equipamentos : [];
+    eqs.forEach(eq => {
+      const q = parseInt(eq.qtd) || 1;
+      const basePeso = parseFloat(eq.peso) || 0;
+      pesoTotal += basePeso * q;
+    });
+
+    const strPeso = `${pesoTotal.toFixed(2)} kg`;
+    const pesoTotalEl = document.getElementById("inventario-peso");
+    if (pesoTotalEl) {
+      pesoTotalEl.value = strPeso;
+    }
+    if (!agenteAtual.inventario) agenteAtual.inventario = {};
+    agenteAtual.inventario.peso = strPeso;
+
+    if (salvarNuvem) {
+      atualizarCampoDebounced("recursos", "carga_leve", strLeve);
+      atualizarCampoDebounced("recursos", "carga_moderada", strMod);
+      atualizarCampoDebounced("recursos", "carga_maxima", strMax);
+      atualizarCampoDebounced("inventario", "peso", strPeso);
+    }
+
+    // 3. Indicador Visual de Penalidade de Carga e Deslocamento
+    const badgeEl = document.getElementById("carga-status-badge");
+    const penalidadeTextEl = document.getElementById("carga-penalidade-text");
+    const deslocamentoTextEl = document.getElementById("carga-deslocamento-text");
+
+    if (badgeEl && penalidadeTextEl && deslocamentoTextEl) {
+      let baseSpeed = 6.0;
+      const modFerimentos = calcularModificadorDeslocamento(agenteAtual.perfil?.traumas);
+      let speedCalculado = Math.max(0, baseSpeed + modFerimentos);
+
+      badgeEl.className = "carga-badge";
+
+      if (valorBaseCarga === 0 && pesoTotal === 0) {
+        badgeEl.classList.add("carga-leve");
+        badgeEl.textContent = "CARGA LEVE";
+        penalidadeTextEl.textContent = "Sem penalidades.";
+        deslocamentoTextEl.textContent = `Deslocamento: ${speedCalculado.toFixed(1)}m`;
+      } else if (pesoTotal <= cargaLeve) {
+        badgeEl.classList.add("carga-leve");
+        badgeEl.textContent = "CARGA LEVE";
+        penalidadeTextEl.textContent = "Sem penalidades.";
+        deslocamentoTextEl.textContent = `Deslocamento: ${speedCalculado.toFixed(1)}m`;
+      } else if (pesoTotal <= cargaMod) {
+        badgeEl.classList.add("carga-moderada");
+        badgeEl.textContent = "CARGA MODERADA";
+        penalidadeTextEl.textContent = "Deslocamento reduzido pela metade.";
+        speedCalculado = speedCalculado / 2;
+        deslocamentoTextEl.textContent = `Deslocamento: ${speedCalculado.toFixed(1)}m`;
+      } else if (pesoTotal <= cargaMax) {
+        badgeEl.classList.add("carga-maxima");
+        badgeEl.textContent = "CARGA MÁXIMA";
+        penalidadeTextEl.textContent = "+2 de penalidade em testes Físicos e metade do movimento.";
+        speedCalculado = speedCalculado / 2;
+        deslocamentoTextEl.textContent = `Deslocamento: ${speedCalculado.toFixed(1)}m`;
+      } else {
+        badgeEl.classList.add("carga-sobrecarga");
+        badgeEl.textContent = "SOBRECARGA";
+        penalidadeTextEl.textContent = "Limite excedido! Personagem incapaz de se mover (0m).";
+        deslocamentoTextEl.textContent = "Deslocamento: 0.0m";
+      }
+    }
+  }
+
+  function atualizarCalculosAutomaticos(salvarNuvem = true) {
+    if (!agenteAtual) return;
+
+    const deveSalvarNuvem = salvarNuvem || (
+      agenteId && (
+        agenteAtual.combate?.defesa === undefined ||
+        agenteAtual.combate?.rd === undefined ||
+        agenteAtual.combate?.db === undefined ||
+        !agenteAtual.status?.pv_max ||
+        !agenteAtual.status?.pd_max
+      )
+    );
+
+    // 1. PV Máximo: (Vigor + Corpo) / 5 (Regra Oficial pág. 31)
+    const vig = parseInt(agenteAtual.atributos?.vigor) || 0;
+    const cor = parseInt(agenteAtual.atributos?.corpo) || 0;
+    const pvMaxBase = Math.floor((vig + cor) / 5);
+    const pvMaxEl = document.getElementById("status-pv_max");
+
+    if (!agenteAtual.status) agenteAtual.status = {};
+
+    let pvMod = Number(agenteAtual.status.pv_max_mod) || 0;
+    // Auto-cura do bug de delta residual
+    if (pvMaxBase > 1 && pvMod === (1 - pvMaxBase)) {
+      pvMod = 0;
+      agenteAtual.status.pv_max_mod = 0;
+    }
+
+    const pvTotal = pvMaxBase > 0 ? Math.max(1, pvMaxBase + pvMod) : (pvMod > 0 ? pvMod : 0);
+    agenteAtual.status.pv_max = pvTotal;
+
+    if (pvMaxEl) {
+      const textoModPv = pvMod !== 0 ? ` | Modificador permanente: ${pvMod > 0 ? "+" : ""}${pvMod}` : "";
+      pvMaxEl.title = `PV Máximo: ${pvTotal} (Base atributos: ${pvMaxBase}${textoModPv}. Editável manualmente)`;
+      if (document.activeElement !== pvMaxEl) {
+        pvMaxEl.value = pvTotal > 0 ? pvTotal : "";
+      }
+    }
+    if (deveSalvarNuvem) {
+      atualizarCampoDebounced("status", "pv_max", pvTotal);
+      atualizarCampoDebounced("status", "pv_max_mod", pvMod);
+    }
+
+    // Se PV atual estiver vazio ou indefinido, inicializa com o PV Máximo
+    const pvEl = document.getElementById("status-pv");
+    if (pvEl && (agenteAtual.status.pv === undefined || agenteAtual.status.pv === null || agenteAtual.status.pv === "")) {
+      pvEl.value = pvTotal > 0 ? pvTotal : "";
+      agenteAtual.status.pv = pvTotal;
+      if (deveSalvarNuvem && pvTotal > 0) atualizarCampoDebounced("status", "pv", pvTotal);
+    }
+
+    // 2. PD Máximo: (Inteligência + Sabedoria) / 5 (Regra Oficial pág. 31 - Humanidade ajustada manualmente na ficha)
+    const int = parseInt(agenteAtual.atributos?.inteligencia) || 0;
+    const sab = parseInt(agenteAtual.atributos?.sabedoria) || 0;
+    const pdMaxBase = Math.floor((int + sab) / 5);
+    const pdMaxEl = document.getElementById("status-pd_max");
+
+    let pdMod = Number(agenteAtual.status.pd_max_mod) || 0;
+    // Auto-cura do bug de delta residual
+    if (pdMaxBase > 1 && pdMod === (1 - pdMaxBase)) {
+      pdMod = 0;
+      agenteAtual.status.pd_max_mod = 0;
+    }
+
+    const pdTotal = pdMaxBase > 0 ? Math.max(1, pdMaxBase + pdMod) : (pdMod > 0 ? pdMod : 0);
+    agenteAtual.status.pd_max = pdTotal;
+
+    if (pdMaxEl) {
+      const textoModPd = pdMod !== 0 ? ` | Modificador permanente: ${pdMod > 0 ? "+" : ""}${pdMod}` : "";
+      pdMaxEl.title = `PD Máximo: ${pdTotal} (Base atributos: ${pdMaxBase}${textoModPd}. Editável manualmente)`;
+      if (document.activeElement !== pdMaxEl) {
+        pdMaxEl.value = pdTotal > 0 ? pdTotal : "";
+      }
+    }
+    if (deveSalvarNuvem) {
+      atualizarCampoDebounced("status", "pd_max", pdTotal);
+      atualizarCampoDebounced("status", "pd_max_mod", pdMod);
+    }
+
+    // Se PD atual estiver vazio ou indefinido, inicializa com o PD Máximo
+    const pdEl = document.getElementById("status-pd");
+    if (pdEl && (agenteAtual.status.pd === undefined || agenteAtual.status.pd === null || agenteAtual.status.pd === "")) {
+      pdEl.value = pdTotal > 0 ? pdTotal : "";
+      agenteAtual.status.pd = pdTotal;
+      if (deveSalvarNuvem && pdTotal > 0) atualizarCampoDebounced("status", "pd", pdTotal);
+    }
+
+    // 3. Dano Bônus (DB): Força + Corpo (Regra Oficial pág. 32)
+    const forca = parseInt(agenteAtual.atributos?.forca) || 0;
+    const somaForCor = forca + cor;
+    let dbCalculado = "0";
+    if (somaForCor > 0) {
+      if (somaForCor <= 59) dbCalculado = "-2";
+      else if (somaForCor <= 79) dbCalculado = "-1";
+      else if (somaForCor <= 119) dbCalculado = "0";
+      else if (somaForCor <= 159) dbCalculado = "+1d4";
+      else if (somaForCor <= 209) dbCalculado = "+1d6";
+      else dbCalculado = "+2d6";
+    }
+    const dbEl = document.getElementById("combate-db");
+    if (dbEl && dbEl.value !== dbCalculado) {
+      dbEl.value = dbCalculado;
+    }
+    if (!agenteAtual.combate) agenteAtual.combate = { rd: 0, defesa: 0, db: "0" };
+    agenteAtual.combate.db = dbCalculado;
+    if (deveSalvarNuvem) {
+      atualizarCampoDebounced("combate", "db", dbCalculado);
+    }
+
+    // 3. Defesa Passiva: Agilidade / 20 + Bônus de Equipamento (Regra Oficial pág. 32)
+    const agi = parseInt(agenteAtual.atributos?.agilidade) || 0;
+    const bonusAgi = Math.floor(agi / 20);
+    let bonusEquip = 0;
+    const eqs = Array.isArray(agenteAtual.inventario?.equipamentos) ? agenteAtual.inventario.equipamentos : [];
+    eqs.forEach(eq => {
+      if (eq.defesa) bonusEquip += parseInt(eq.defesa) || 0;
+    });
+    const defesaCalculada = bonusAgi + bonusEquip;
+    const defesaEl = document.getElementById("combate-defesa");
+    if (defesaEl && String(defesaEl.value) !== String(defesaCalculada)) {
+      defesaEl.value = defesaCalculada;
+    }
+    agenteAtual.combate.defesa = defesaCalculada;
+    if (deveSalvarNuvem) {
+      atualizarCampoDebounced("combate", "defesa", defesaCalculada);
+    }
+
+    // 4. Redução de Dano (RD): Soma de RD das vestimentas e proteções do inventário
+    let rdCalculado = 0;
+    eqs.forEach(eq => {
+      if (eq.rd != null && eq.rd !== "") {
+        rdCalculado += Number(eq.rd) || 0;
+      }
+    });
+    const rdEl = document.getElementById("combate-rd");
+    if (rdEl && String(rdEl.value) !== String(rdCalculado)) {
+      rdEl.value = rdCalculado;
+    }
+    agenteAtual.combate.rd = rdCalculado;
+    if (deveSalvarNuvem) {
+      atualizarCampoDebounced("combate", "rd", rdCalculado);
+    }
+
+    // 5. Limites de Carga e Penalidades de Deslocamento
+    calcularEAtualizarCargaESpeed(deveSalvarNuvem);
   }
 
   function renderizarTraumas() {
@@ -1376,9 +2032,117 @@ if (formFicha) {
     });
   }
 
+  function renderizarArmas() {
+    const container = document.getElementById("inventario-armas-lista");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const armas = Array.isArray(agenteAtual?.inventario?.armas) ? agenteAtual.inventario.armas : [];
+    if (armas.length === 0) {
+      container.innerHTML = '<p style="color: var(--muted); font-style: italic; font-size: 11px; margin: 0;">Nenhuma arma no inventário.</p>';
+      return;
+    }
+
+    armas.forEach((arma, index) => {
+      const card = document.createElement("div");
+      card.className = "interactive-item-card";
+
+      let detailsStr = `<strong>${escapeHtml(arma.tipo || arma.categoria || "Arma")}</strong>`;
+      if (arma.dano && arma.dano !== "-") detailsStr += ` | Dano: <strong>${escapeHtml(arma.dano)}</strong>${arma.danoTipo && arma.danoTipo !== "-" ? ` (${escapeHtml(arma.danoTipo)})` : ""}`;
+      if (arma.alc && arma.alc !== "-") detailsStr += ` | Alc: <strong>${escapeHtml(arma.alc)}</strong>`;
+      if (arma.atq && arma.atq !== "-") detailsStr += ` | Atq: <strong>${escapeHtml(String(arma.atq))}</strong>`;
+      if (arma.fa && arma.fa !== "-") detailsStr += ` | Fa: <strong>${escapeHtml(String(arma.fa))}</strong>`;
+      detailsStr += ` | Peso: <strong>${arma.peso} kg</strong>`;
+
+      const munMax = parseInt(arma.munMax) || 0;
+      const isAtaqueDisparo = munMax > 0;
+      const curMun = arma.mun !== undefined ? parseInt(arma.mun) || 0 : munMax;
+      const pentes = arma.pentes !== undefined ? parseInt(arma.pentes) || 0 : 1;
+      const totalBalas = curMun + (pentes * munMax);
+      const pesoBalas = totalBalas * 0.01;
+
+      let controlsHtml = `
+        <div class="item-card-controls" style="flex-wrap: wrap; gap: 8px; margin-top: 6px;">
+          <label>Qtd:
+            <input type="number" min="1" value="${arma.qtd || 1}" ${isReadOnly ? "disabled" : ""} onchange="window.alterarQuantidadeArma(${index}, this.value)" style="width: 40px;" />
+          </label>
+      `;
+
+      if (isAtaqueDisparo) {
+        controlsHtml += `
+          <label style="margin-left: 4px;">Balas no Pente:
+            <input type="number" min="0" max="${munMax}" value="${curMun}" ${isReadOnly ? "disabled" : ""} onchange="window.alterarMunicaoArma(${index}, this.value)" style="width: 45px;" />
+            / ${munMax}
+          </label>
+          <label style="margin-left: 4px;">Pentes Extras:
+            <input type="number" min="0" value="${pentes}" ${isReadOnly ? "disabled" : ""} onchange="window.alterarPentesArma(${index}, this.value)" style="width: 45px;" />
+          </label>
+        `;
+      }
+
+      controlsHtml += `</div>`;
+
+      if (isAtaqueDisparo) {
+        controlsHtml += `
+          <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">
+            Munição total: <strong>${totalBalas} balas</strong> (${pesoBalas.toFixed(2)} kg)
+          </div>
+        `;
+      }
+
+      const modsList = Array.isArray(arma.melhorias) ? arma.melhorias : [];
+      const upgradesHtml = `
+        <div class="item-card-upgrades" style="margin-top: 6px; padding-top: 4px; border-top: 1px dashed rgba(128,128,128,0.2); font-size: 11px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px;">
+            <span><strong>Modificações:</strong></span>
+            ${!isReadOnly ? `
+              <select onchange="if(this.value){window.adicionarModificacaoArma(${index}, this.value); this.value='';}" style="font-size: 11px; padding: 1px 4px; height: 22px; width: auto; max-width: 175px;">
+                <option value="">+ Modificação...</option>
+                ${(REGRAS.modificacoesArmas || []).filter(mod => !modsList.includes(mod.nome)).map(mod => `
+                  <option value="${escapeHtml(mod.nome)}">${escapeHtml(mod.nome)} (+${mod.peso}kg)</option>
+                `).join("")}
+              </select>
+            ` : ""}
+          </div>
+          <div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
+            ${modsList.length > 0 ? modsList.map(m => `
+              <span style="display: inline-flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.06); padding: 1px 6px; border-radius: 3px; font-size: 10px;">
+                ${escapeHtml(m)}
+                ${!isReadOnly ? `<span onclick="window.removerModificacaoArma(${index}, '${escapeHtml(m)}')" style="cursor: pointer; font-weight: bold; color: #ff5252; margin-left: 2px;" title="Remover">×</span>` : ""}
+              </span>
+            `).join("") : '<span style="color: var(--muted); font-style: italic; font-size: 10px;">Nenhuma modificação anexada.</span>'}
+          </div>
+        </div>
+      `;
+
+      card.innerHTML = `
+        <div class="item-card-header">
+          <span class="item-card-title">${escapeHtml(arma.nome)}</span>
+          ${isReadOnly ? "" : `
+            <div class="item-card-actions">
+              <button type="button" class="item-card-edit" onclick="window.editarArma(${index})">Editar</button>
+              <button type="button" class="item-card-remove" onclick="window.removerArma(${index})">Remover</button>
+            </div>
+          `}
+        </div>
+        <div class="item-card-details">${detailsStr}</div>
+        ${upgradesHtml}
+        ${controlsHtml}
+      `;
+      container.appendChild(card);
+    });
+  }
+
   function renderizarEquipamentos() {
     const container = document.getElementById("inventario-equipamentos-lista");
     if (!container) return;
+
+    // Preservar estado aberto das gavetas de descrição
+    const openIndexes = new Set();
+    container.querySelectorAll(".interactive-item-card").forEach((c, i) => {
+      if (c.querySelector("details")?.open) openIndexes.add(i);
+    });
+
     container.innerHTML = "";
 
     const equipamentos = Array.isArray(agenteAtual?.inventario?.equipamentos) ? agenteAtual.inventario.equipamentos : [];
@@ -1391,55 +2155,39 @@ if (formFicha) {
       const card = document.createElement("div");
       card.className = "interactive-item-card";
 
-      const isArma = eq.tipo && (eq.tipo.toLowerCase().includes("cc") || eq.tipo.toLowerCase().includes("dist") || eq.tipo.toLowerCase().includes("arma"));
-      const isAtaqueDisparo = isArma && eq.munMax > 0;
-      
-      let detailsStr = `Peso: ${eq.peso} kg`;
-      if (eq.dano && eq.dano !== "-") detailsStr += ` | Dano: ${eq.dano}`;
-      if (eq.fa && eq.fa !== "-") detailsStr += ` | Falha: ${eq.fa}`;
+      let detailsStr = `Categoria: <strong>${escapeHtml(eq.categoria || eq.tipo || "Geral")}</strong> | Peso: <strong>${eq.peso} kg</strong>`;
+      if (eq.preco != null && eq.preco !== "") detailsStr += ` | Preço: <strong>${eq.preco} €</strong>`;
+      if (eq.rd != null && eq.rd !== "" && Number(eq.rd) > 0) detailsStr += ` | RD: <strong>${eq.rd}</strong>`;
+      if (eq.dano) detailsStr += ` | Dano: <strong>${escapeHtml(eq.dano)}</strong>`;
 
       let controlsHtml = `
         <div class="item-card-controls">
           <label>Qtd:
             <input type="number" min="1" value="${eq.qtd || 1}" ${isReadOnly ? "disabled" : ""} onchange="window.alterarQuantidadeEquipamento(${index}, this.value)" style="width: 40px;" />
           </label>
+        </div>
       `;
 
-      if (isAtaqueDisparo) {
-        controlsHtml += `
-          <label>Munição:
-            <input type="number" min="0" max="${eq.munMax}" value="${eq.mun || 0}" ${isReadOnly ? "disabled" : ""} onchange="window.alterarMunicaoEquipamento(${index}, this.value)" style="width: 45px;" />
-            / ${eq.munMax}
-          </label>
-        `;
-      }
-
-      controlsHtml += `</div>`;
-
-      let upgradesHtml = "";
-      if (isArma && !isReadOnly) {
-        upgradesHtml = `<div class="item-card-upgrades"><strong>Melhorias:</strong><br/>`;
-        MELHORIAS_ARMAS.forEach(mel => {
-          const checked = Array.isArray(eq.melhorias) && eq.melhorias.includes(mel.nome) ? "checked" : "";
-          upgradesHtml += `
-            <label style="margin-right: 8px; display: inline-block;">
-              <input type="checkbox" ${checked} onchange="window.toggleUpgrade(${index}, '${mel.nome}', this.checked)" />
-              ${mel.nome} (+${mel.peso}kg)
-            </label>
-          `;
-        });
-        upgradesHtml += `</div>`;
-      } else if (isArma && Array.isArray(eq.melhorias) && eq.melhorias.length > 0) {
-        upgradesHtml = `<div class="item-card-upgrades"><strong>Melhorias:</strong> ${eq.melhorias.join(", ")}</div>`;
-      }
+      const hasDesc = !!(eq.desc || eq.descricao);
+      const descHtml = hasDesc ? `
+        <details class="item-card-collapse" ${openIndexes.has(index) ? "open" : ""}>
+          <summary>Ver Descrição ▾</summary>
+          <div class="item-card-collapse-content">${escapeHtml(eq.desc || eq.descricao)}</div>
+        </details>
+      ` : "";
 
       card.innerHTML = `
         <div class="item-card-header">
-          <span class="item-card-title">${eq.nome}</span>
-          ${isReadOnly ? "" : `<button type="button" class="item-card-remove" onclick="window.removerEquipamento(${index})">Remover</button>`}
+          <span class="item-card-title">${escapeHtml(eq.nome)}</span>
+          ${isReadOnly ? "" : `
+            <div class="item-card-actions">
+              <button type="button" class="item-card-edit" onclick="window.editarEquipamento(${index})">Editar</button>
+              <button type="button" class="item-card-remove" onclick="window.removerEquipamento(${index})">Remover</button>
+            </div>
+          `}
         </div>
         <div class="item-card-details">${detailsStr}</div>
-        ${upgradesHtml}
+        ${descHtml}
         ${controlsHtml}
       `;
       container.appendChild(card);
@@ -1449,6 +2197,13 @@ if (formFicha) {
   function renderizarBensMateriais() {
     const container = document.getElementById("recursos-bens_materiais-lista");
     if (!container) return;
+
+    // Preservar estado aberto das gavetas de melhorias
+    const openIndexes = new Set();
+    container.querySelectorAll(".interactive-item-card").forEach((c, i) => {
+      if (c.querySelector("details")?.open) openIndexes.add(i);
+    });
+
     container.innerHTML = "";
 
     const bens = Array.isArray(agenteAtual?.recursos?.bens_materiais) ? agenteAtual.recursos.bens_materiais : [];
@@ -1462,29 +2217,56 @@ if (formFicha) {
       card.className = "interactive-item-card";
 
       const isMoradia = bem.tipo === "moradia";
-      const detailsStr = isMoradia ? `Moradia | Custo: ${bem.preco || 0} Créditos` : `Veículo | Velocidade: ${bem.velocidade || "N/A"} | Custo: ${bem.preco || 0} Créditos`;
+      let detailsStr = "";
+      if (isMoradia) {
+        detailsStr = `Tipo: <strong>Moradia</strong> | Custo: <strong>${(bem.preco || 0).toLocaleString('pt-PT')} €</strong>`;
+      } else if (bem.tipo === "veiculo") {
+        detailsStr = `Tipo: <strong>Veículo</strong> | Velocidade: <strong>${bem.velocidade || "N/A"}</strong>${bem.passageiros ? ` | Passageiros: <strong>${bem.passageiros}</strong>` : ""} | Custo: <strong>${(bem.preco || 0).toLocaleString('pt-PT')} €</strong>`;
+      } else {
+        detailsStr = `Tipo: <strong>${escapeHtml(bem.tipo || "Bem Material")}</strong> | Custo: <strong>${(bem.preco || 0).toLocaleString('pt-PT')} €</strong>`;
+      }
 
       let upgradesHtml = "";
       if (isMoradia && !isReadOnly) {
-        upgradesHtml = `<div class="item-card-upgrades"><strong>Melhorias de Moradia:</strong><br/>`;
-        REGRAS.melhoriasMoradia.forEach(mel => {
-          const checked = Array.isArray(bem.upgrades) && bem.upgrades.includes(mel.nome) ? "checked" : "";
+        const activeUpgrades = Array.isArray(bem.upgrades) ? bem.upgrades : [];
+        const summaryText = activeUpgrades.length > 0
+          ? `⚙️ Melhorias (${activeUpgrades.length}/6): ${escapeHtml(activeUpgrades.join(", "))} ▾`
+          : `⚙️ Adicionar Melhorias (0 ativas) ▾`;
+
+        upgradesHtml = `
+          <details class="item-card-collapse" ${openIndexes.has(index) ? "open" : ""}>
+            <summary>${summaryText}</summary>
+            <div class="item-card-collapse-content" style="margin-top: 4px;">
+              <div style="font-weight: bold; margin-bottom: 6px; font-size: 10.5px;">Melhorias da Moradia:</div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+        `;
+        (REGRAS.melhoriasMoradia || []).forEach(mel => {
+          const checked = activeUpgrades.includes(mel.nome) ? "checked" : "";
           upgradesHtml += `
-            <label style="margin-right: 8px; display: inline-block;">
-              <input type="checkbox" ${checked} onchange="window.toggleMoradiaUpgrade(${index}, '${mel.nome}', this.checked)" />
-              ${mel.nome} (${mel.preco}¢)
+            <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; cursor: pointer;">
+              <input type="checkbox" ${checked} onchange="window.toggleMoradiaUpgrade(${index}, '${escapeHtml(mel.nome)}', this.checked)" />
+              <span>${escapeHtml(mel.nome)} <small style="color: var(--muted, #888);">(${mel.preco}€)</small></span>
             </label>
           `;
         });
-        upgradesHtml += `</div>`;
+        upgradesHtml += `</div></div></details>`;
       } else if (isMoradia && Array.isArray(bem.upgrades) && bem.upgrades.length > 0) {
-        upgradesHtml = `<div class="item-card-upgrades"><strong>Melhorias:</strong> ${bem.upgrades.join(", ")}</div>`;
+        upgradesHtml = `
+          <div class="item-card-upgrades" style="margin-top: 4px; font-size: 11px;">
+            <strong>Melhorias:</strong> ${bem.upgrades.map(u => `<span class="item-card-upgrade-tag">${escapeHtml(u)}</span>`).join("")}
+          </div>
+        `;
       }
 
       card.innerHTML = `
         <div class="item-card-header">
-          <span class="item-card-title">${bem.nome}</span>
-          ${isReadOnly ? "" : `<button type="button" class="item-card-remove" onclick="window.removerBemMaterial(${index})">Remover</button>`}
+          <span class="item-card-title">${escapeHtml(bem.nome)}</span>
+          ${isReadOnly ? "" : `
+            <div class="item-card-actions">
+              <button type="button" class="item-card-edit" onclick="window.editarBemMaterial(${index})">Editar</button>
+              <button type="button" class="item-card-remove" onclick="window.removerBemMaterial(${index})">Remover</button>
+            </div>
+          `}
         </div>
         <div class="item-card-details">${detailsStr}</div>
         ${upgradesHtml}
@@ -1595,6 +2377,7 @@ if (formFicha) {
 
   function renderizarTudoInterativo() {
     renderizarTraumas();
+    renderizarArmas();
     renderizarEquipamentos();
     renderizarBensMateriais();
     renderizarHabilidadesPoderes();
@@ -1671,11 +2454,28 @@ if (formFicha) {
         opt.textContent = c;
         filterSelect.appendChild(opt);
       });
+    } else if (tipo === "arma") {
+      title.textContent = "Adicionar Arma";
+      filterSelect.style.display = "block";
+      const catsArmas = [
+        { val: "", label: "Todas as Armas" },
+        { val: "Corpo a Corpo - Leve", label: "Corpo a Corpo - Leve" },
+        { val: "Corpo a Corpo - Pesada", label: "Corpo a Corpo - Pesada" },
+        { val: "Distância - Leve", label: "Distância - Leve" },
+        { val: "Distância - Pesada", label: "Distância - Pesada" },
+        { val: "Arma Amaldiçoada (Véu)", label: "Armas do Véu" }
+      ];
+      catsArmas.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c.val;
+        opt.textContent = c.label;
+        filterSelect.appendChild(opt);
+      });
     } else if (tipo === "equipamento") {
       title.textContent = "Adicionar Equipamento";
       filterSelect.style.display = "block";
       const cats = [
-        { val: "armas", label: "Armas (Corpo a Corpo e Fogo)" },
+        { val: "", label: "Todos os Equipamentos" },
         { val: "explosivos", label: "Explosivos" },
         { val: "gerais", label: "Equipamentos Gerais" },
         { val: "vestimentas", label: "Vestimentas e Proteções" },
@@ -1697,7 +2497,7 @@ if (formFicha) {
 
     const btnCustom = document.getElementById("modal-selecao-btn-custom");
     if (btnCustom) {
-      if (["fobia", "mania", "ferimento", "maldicao", "habilidade", "poder", "ritual"].includes(tipo)) {
+      if (["fobia", "mania", "ferimento", "maldicao", "habilidade", "poder", "ritual", "arma", "equipamento", "moradia", "veiculo"].includes(tipo)) {
         btnCustom.style.display = "flex";
         btnCustom.textContent = tipo === "ritual"
           ? "+ Criar Ritual Próprio"
@@ -1707,7 +2507,15 @@ if (formFicha) {
               ? "+ Criar Poder Próprio"
               : (tipo === "maldicao"
                 ? "+ Criar Maldição Própria"
-                : "+ Criar Próprio")));
+                : (tipo === "arma"
+                  ? "+ Criar Arma Própria"
+                  : (tipo === "equipamento"
+                    ? "+ Criar Equipamento Próprio"
+                    : (tipo === "moradia"
+                      ? "+ Criar Moradia Própria"
+                      : (tipo === "veiculo"
+                        ? "+ Criar Veículo Próprio"
+                        : "+ Criar Próprio")))))));
         btnCustom.onclick = () => {
           modal.classList.add("hidden");
           if (tipo === "fobia" || tipo === "mania" || tipo === "ferimento" || tipo === "maldicao") {
@@ -1716,6 +2524,12 @@ if (formFicha) {
             abrirEditorHabilidadePoder(-1, tipo);
           } else if (tipo === "ritual") {
             abrirEditorRitual(-1);
+          } else if (tipo === "arma") {
+            abrirEditorArma(-1);
+          } else if (tipo === "equipamento") {
+            abrirEditorEquipamento(-1);
+          } else if (tipo === "moradia" || tipo === "veiculo") {
+            abrirEditorBemMaterial(-1, tipo);
           }
         };
       } else {
@@ -1817,20 +2631,23 @@ if (formFicha) {
       if (filterVal) {
         items = items.filter(r => r.circulo === filterVal);
       }
+    } else if (currentModalType === "arma") {
+      items = (REGRAS.armas || []).map(a => ({ ...a, eqType: "armas", category: "Arma" }));
+      if (filterVal) {
+        items = items.filter(a => a.categoria === filterVal || a.tipo === filterVal);
+      }
     } else if (currentModalType === "equipamento") {
-      const armas = REGRAS.armas.map(a => ({ ...a, eqType: "armas", category: "Arma" }));
-      const explosivos = REGRAS.explosivos.map(e => ({ ...e, eqType: "explosivos", category: "Explosivo" }));
-      const gerais = REGRAS.equipamentosGerais.map(g => ({ ...g, eqType: "gerais", category: "Geral" }));
-      const vestimentas = REGRAS.vestimentas.map(v => ({ ...v, eqType: "vestimentas", category: "Vestimenta" }));
-      const veu = REGRAS.equipamentosVeu.map(v => ({ ...v, eqType: "veu", category: "Véu" }));
+      const explosivos = (REGRAS.explosivos || []).map(e => ({ ...e, eqType: "explosivos", category: "Explosivo" }));
+      const gerais = (REGRAS.equipamentosGerais || []).map(g => ({ ...g, eqType: "gerais", category: "Equipamento Geral" }));
+      const vestimentas = (REGRAS.vestimentas || []).map(v => ({ ...v, eqType: "vestimentas", category: "Vestimenta" }));
+      const veu = (REGRAS.equipamentosVeu || []).map(v => ({ ...v, eqType: "veu", category: "Equipamento do Véu" }));
 
-      if (filterVal === "armas") items = armas;
-      else if (filterVal === "explosivos") items = explosivos;
+      if (filterVal === "explosivos") items = explosivos;
       else if (filterVal === "gerais") items = gerais;
       else if (filterVal === "vestimentas") items = vestimentas;
       else if (filterVal === "veu") items = veu;
       else {
-        items = [...armas, ...explosivos, ...gerais, ...vestimentas, ...veu];
+        items = [...explosivos, ...gerais, ...vestimentas, ...veu];
       }
     } else if (currentModalType === "moradia") {
       items = REGRAS.moradias.map(m => ({ ...m, type: "moradia" }));
@@ -1857,6 +2674,9 @@ if (formFicha) {
           item.afinidade,
           item.tipo,
           item.type,
+          item.dano,
+          item.danoTipo,
+          item.alc,
           item.id != null ? `${item.id} #${item.id}` : ""
         ].filter(Boolean).join(" "));
 
@@ -1890,157 +2710,221 @@ if (formFicha) {
       } else if (currentModalType === "ritual") {
         detailsStr = `Circulo: ${item.circulo} | Aspecto: ${item.aspecto} | Custo: ${item.custo}`;
         if (item.condicao && item.condicao !== "-") detailsStr += ` | Condição: ${item.condicao}`;
+      } else if (currentModalType === "arma" || (currentModalType === "equipamento" && item.category === "Arma")) {
+        detailsStr = `Tipo: <strong>${item.categoria || item.tipo}</strong> | Dano: <strong>${item.dano}</strong>${item.danoTipo ? ` (${item.danoTipo})` : ""} | Alc: <strong>${item.alc}</strong> | Atq: <strong>${item.atq}</strong> | Peso: <strong>${item.peso} kg</strong>`;
+        if (item.fa && item.fa !== "-") detailsStr += ` | Fa: <strong>${item.fa}</strong>`;
+        if (item.mun && item.mun !== "-") detailsStr += ` | Mun: <strong>${item.mun}</strong>`;
+        descStr = ""; // Armas não possuem descrição nas regras oficiais
       } else if (currentModalType === "equipamento") {
-        detailsStr = `${item.category} | Peso: ${item.peso} kg | Categoria: ${item.cat}`;
-        if (item.dano) detailsStr += ` | Dano: ${item.dano}`;
+        detailsStr = `Categoria: <strong>${item.category || item.cat || "Geral"}</strong> | Peso: <strong>${item.peso} kg</strong>`;
+        if (item.preco != null) detailsStr += ` | Preço: <strong>${item.preco} €</strong>`;
+        if (item.rd != null && item.rd !== "" && Number(item.rd) > 0) detailsStr += ` | RD: <strong>${item.rd}</strong>`;
+        if (item.dano) detailsStr += ` | Dano: <strong>${item.dano}</strong>`;
       } else if (currentModalType === "moradia") {
-        detailsStr = `Custo: ${item.preco} Créditos`;
+        detailsStr = `Tipo: <strong>Moradia</strong> | Custo: <strong>${(item.preco || 0).toLocaleString('pt-PT')} €</strong>`;
       } else if (currentModalType === "veiculo") {
-        detailsStr = `Tipo: ${item.tipo} | Velocidade: ${item.velocidade} | Custo: ${item.preco} Créditos`;
+        detailsStr = `Tipo: <strong>${escapeHtml(item.tipo || "Veículo")}</strong> | Velocidade: <strong>${item.velocidade || "N/A"}</strong>${item.passageiros ? ` | Passageiros: <strong>${item.passageiros}</strong>` : ""} | Custo: <strong>${(item.preco || 0).toLocaleString('pt-PT')} €</strong>`;
       } else if (item.detalhes) {
         detailsStr = item.detalhes;
       }
 
       row.innerHTML = `
         <div class="modal-list-item-header">
-          <span class="modal-list-item-title">${item.nome}</span>
-          <button type="button" class="modal-list-item-btn" id="modal-add-item-${idx}">+ Adicionar</button>
+          <span class="modal-list-item-title">${escapeHtml(item.nome)}</span>
+          <button type="button" class="modal-list-item-btn">+ Adicionar</button>
         </div>
         ${detailsStr ? `<div class="modal-list-item-details">${detailsStr}</div>` : ""}
-        ${descStr ? `<div class="modal-list-item-desc">${descStr}</div>` : ""}
+        ${descStr ? `<div class="modal-list-item-desc">${escapeHtml(descStr)}</div>` : ""}
       `;
 
-      body.appendChild(row);
+      const btnAdd = row.querySelector(".modal-list-item-btn");
+      if (btnAdd) {
+        btnAdd.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          adicionarItem(item);
+        };
+      }
 
-      document.getElementById(`modal-add-item-${idx}`).onclick = () => {
-        adicionarItem(item);
-      };
+      body.appendChild(row);
     });
   }
 
   function adicionarItem(item) {
-    if (isReadOnly || !agenteAtual) return;
+    if (isReadOnly) return;
+    if (!agenteAtual) agenteAtual = criarAgenteEmBranco("Agente");
 
-    if (currentModalType === "fobia" || currentModalType === "mania" || currentModalType === "ferimento" || currentModalType === "maldicao") {
-      if (!Array.isArray(agenteAtual.perfil.traumas)) agenteAtual.perfil.traumas = [];
-      const itemTipo = item.tipo || item.type || currentModalType;
-      agenteAtual.perfil.traumas.push({
-        id: item.id,
-        nome: item.nome,
-        type: itemTipo,
-        tipo: itemTipo,
-        efeito: item.descricao || item.efeito || item.desc || ""
-      });
-      renderizarTraumas();
-      calcularEAtualizarCargaESpeed();
-      updateDoc(doc(db, "agentes", String(agenteId)), {
-        "perfil.traumas": agenteAtual.perfil.traumas
-      }).catch(e => console.error("Erro ao salvar trauma:", e));
-    } else if (currentModalType === "equipamento") {
-      if (!Array.isArray(agenteAtual.inventario.equipamentos)) agenteAtual.inventario.equipamentos = [];
-      agenteAtual.inventario.equipamentos.push({
-        id: item.id,
-        nome: item.nome,
-        tipo: item.tipo || item.category,
-        peso: item.peso || 0,
-        qtd: 1,
-        mun: 0,
-        munMax: parseInt(item.mun) || 0,
-        melhorias: [],
-        fa: item.fa || "-",
-        dano: item.dano || "-"
-      });
-      renderizarEquipamentos();
-      calcularEAtualizarCargaESpeed();
-      salvarEquipamentosNuvem();
-    } else if (currentModalType === "moradia") {
-      if (!Array.isArray(agenteAtual.recursos.bens_materiais)) agenteAtual.recursos.bens_materiais = [];
-      agenteAtual.recursos.bens_materiais.push({
-        id: item.id,
-        nome: item.nome,
-        tipo: "moradia",
-        preco: item.preco,
-        upgrades: []
-      });
-      renderizarBensMateriais();
-      salvarBensMateriaisNuvem();
-    } else if (currentModalType === "veiculo") {
-      if (!Array.isArray(agenteAtual.recursos.bens_materiais)) agenteAtual.recursos.bens_materiais = [];
-      agenteAtual.recursos.bens_materiais.push({
-        id: item.id,
-        nome: item.nome,
-        tipo: "veiculo",
-        preco: item.preco,
-        velocidade: item.velocidade || "N/A"
-      });
-      renderizarBensMateriais();
-      salvarBensMateriaisNuvem();
-    } else if (currentModalType === "habilidade") {
-      if (!Array.isArray(agenteAtual.habilidades.lista)) agenteAtual.habilidades.lista = [];
-      if (item.categoria === "Banda") {
-        const totalBanda = agenteAtual.habilidades.lista.filter(x => x.categoria === "Banda").length;
-        if (totalBanda >= 2) {
-          return alert("Limite das Regras: Cada personagem pode ter no máximo 2 Habilidades de Banda.");
+    try {
+      if (currentModalType === "fobia" || currentModalType === "mania" || currentModalType === "ferimento" || currentModalType === "maldicao") {
+        if (!agenteAtual.perfil) agenteAtual.perfil = { traumas: [] };
+        if (!Array.isArray(agenteAtual.perfil.traumas)) agenteAtual.perfil.traumas = [];
+        const itemTipo = item.tipo || item.type || currentModalType;
+        agenteAtual.perfil.traumas.push({
+          id: item.id || Date.now(),
+          nome: item.nome,
+          type: itemTipo,
+          tipo: itemTipo,
+          efeito: item.descricao || item.efeito || item.desc || ""
+        });
+        renderizarTraumas();
+        calcularEAtualizarCargaESpeed();
+        if (agenteId) {
+          updateDoc(doc(db, "agentes", String(agenteId)), sanitizarParaFirestore({
+            "perfil.traumas": agenteAtual.perfil.traumas
+          })).catch(e => console.error("Erro ao salvar trauma:", e));
         }
+      } else if (currentModalType === "arma") {
+        if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], armas: [], carga: 0, peso: "0 kg" };
+        if (!Array.isArray(agenteAtual.inventario.armas)) agenteAtual.inventario.armas = [];
+        const munMaxNum = typeof item.mun === "number" ? item.mun : (parseInt(item.mun) || 0);
+        agenteAtual.inventario.armas.push({
+          id: item.id || Date.now(),
+          nome: item.nome,
+          tipo: item.tipo || item.categoria || "Arma",
+          categoria: item.categoria || item.tipo || "Arma",
+          peso: typeof item.peso === "number" ? item.peso : (parseFloat(item.peso) || 0),
+          qtd: 1,
+          mun: munMaxNum,
+          munMax: munMaxNum,
+          pentes: munMaxNum > 0 ? 1 : 0,
+          melhorias: [],
+          fa: item.fa || "-",
+          dano: item.dano || "-",
+          danoTipo: item.danoTipo || "-",
+          alc: item.alc || "-",
+          atq: item.atq || "1"
+        });
+        renderizarArmas();
+        calcularEAtualizarCargaESpeed();
+        if (agenteId) salvarArmasNuvem();
+      } else if (currentModalType === "equipamento") {
+        if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], armas: [], carga: 0, peso: "0 kg" };
+        if (!Array.isArray(agenteAtual.inventario.equipamentos)) agenteAtual.inventario.equipamentos = [];
+        const eqObj = {
+          id: item.id || Date.now(),
+          nome: item.nome,
+          tipo: item.category || item.tipo || item.cat || "Equipamento",
+          categoria: item.category || item.tipo || item.cat || "Equipamento",
+          preco: item.preco != null ? (Number(item.preco) || 0) : 0,
+          peso: typeof item.peso === "number" ? item.peso : (parseFloat(item.peso) || 0),
+          qtd: 1,
+          desc: item.desc || item.descricao || item.efeito || ""
+        };
+        if (item.rd != null && item.rd !== "" && Number(item.rd) > 0) {
+          eqObj.rd = Number(item.rd);
+        }
+        if (item.dano) {
+          eqObj.dano = String(item.dano);
+        }
+        agenteAtual.inventario.equipamentos.push(eqObj);
+        renderizarEquipamentos();
+        atualizarCalculosAutomaticos(true);
+        if (agenteId) salvarEquipamentosNuvem();
+      } else if (currentModalType === "moradia") {
+        if (!agenteAtual.recursos) agenteAtual.recursos = { bens_materiais: [] };
+        if (!Array.isArray(agenteAtual.recursos.bens_materiais)) agenteAtual.recursos.bens_materiais = [];
+        agenteAtual.recursos.bens_materiais.push({
+          id: item.id || Date.now(),
+          nome: item.nome,
+          tipo: "moradia",
+          preco: Number(item.preco) || 0,
+          upgrades: []
+        });
+        renderizarBensMateriais();
+        if (agenteId) salvarBensMateriaisNuvem();
+      } else if (currentModalType === "veiculo") {
+        if (!agenteAtual.recursos) agenteAtual.recursos = { bens_materiais: [] };
+        if (!Array.isArray(agenteAtual.recursos.bens_materiais)) agenteAtual.recursos.bens_materiais = [];
+        const veicObj = {
+          id: item.id || Date.now(),
+          nome: item.nome,
+          tipo: "veiculo",
+          preco: Number(item.preco) || 0,
+          velocidade: item.velocidade || "N/A"
+        };
+        if (item.passageiros) veicObj.passageiros = item.passageiros;
+        agenteAtual.recursos.bens_materiais.push(veicObj);
+        renderizarBensMateriais();
+        if (agenteId) salvarBensMateriaisNuvem();
+      } else if (currentModalType === "habilidade") {
+        if (!agenteAtual.habilidades) agenteAtual.habilidades = { lista: [], rituais: [] };
+        if (!Array.isArray(agenteAtual.habilidades.lista)) agenteAtual.habilidades.lista = [];
+        if (item.categoria === "Banda") {
+          const totalBanda = agenteAtual.habilidades.lista.filter(x => x.categoria === "Banda").length;
+          if (totalBanda >= 2) {
+            return alert("Limite das Regras: Cada personagem pode ter no máximo 2 Habilidades de Banda.");
+          }
+        }
+        agenteAtual.habilidades.lista.push({
+          id: item.id || Date.now(),
+          nome: item.nome,
+          tipo: "habilidade",
+          categoria: item.categoria || "Geral",
+          custo: item.custo || "-",
+          descricao: item.descricao || "",
+          requisito: item.requisito || "-"
+        });
+        renderizarHabilidadesPoderes();
+        calcularEAtualizarCargaESpeed();
+        if (agenteId) {
+          updateDoc(doc(db, "agentes", String(agenteId)), sanitizarParaFirestore({
+            "habilidades.lista": agenteAtual.habilidades.lista
+          })).catch(e => console.error("Erro ao salvar habilidade:", e));
+        }
+      } else if (currentModalType === "poder") {
+        if (!agenteAtual.habilidades) agenteAtual.habilidades = { lista: [], rituais: [] };
+        if (!Array.isArray(agenteAtual.habilidades.lista)) agenteAtual.habilidades.lista = [];
+        agenteAtual.habilidades.push ? null : null;
+        agenteAtual.habilidades.lista.push({
+          id: item.id || Date.now(),
+          nome: item.nome,
+          tipo: "poder",
+          vertente: item.vertente || "Uncanny",
+          custo: item.custo || "-",
+          descricao: item.descricao || "",
+          afinidade: item.afinidade || "",
+          afinidadeAtiva: false
+        });
+        renderizarHabilidadesPoderes();
+        
+        const numPoderes = agenteAtual.habilidades.lista.filter(x => x.tipo === "poder").length;
+        const calculatedGC = 50 + numPoderes * 5;
+        if (!agenteAtual.status) agenteAtual.status = { gc: 50 };
+        agenteAtual.status.gc = calculatedGC;
+        const gcInput = document.getElementById("status-gc");
+        if (gcInput) gcInput.value = calculatedGC;
+
+        if (agenteId) {
+          updateDoc(doc(db, "agentes", String(agenteId)), sanitizarParaFirestore({
+            "habilidades.lista": agenteAtual.habilidades.lista,
+            "status.gc": calculatedGC
+          })).catch(e => console.error("Erro ao salvar poder e GC:", e));
+        }
+      } else if (currentModalType === "ritual") {
+        if (!agenteAtual.habilidades) agenteAtual.habilidades = { lista: [], rituais: [] };
+        if (!Array.isArray(agenteAtual.habilidades.rituais)) agenteAtual.habilidades.rituais = [];
+        agenteAtual.habilidades.rituais.push({
+          id: item.id || Date.now(),
+          nome: item.nome,
+          circulo: item.circulo || "Básico",
+          aspecto: item.aspecto || "-",
+          custo: item.custo || "-",
+          alc: item.alc || "-",
+          target: item.target || "-",
+          duracao: item.duracao || "-",
+          resistencia: item.resistencia || "-",
+          condicao: item.condicao || "-",
+          desc: item.desc || ""
+        });
+        renderizarRituais();
+        if (agenteId) salvarRituaisNuvem();
       }
-      agenteAtual.habilidades.lista.push({
-        id: item.id,
-        nome: item.nome,
-        tipo: "habilidade",
-        categoria: item.categoria,
-        custo: item.custo,
-        descricao: item.descricao,
-        requisito: item.requisito || "-"
-      });
-      renderizarHabilidadesPoderes();
-      calcularEAtualizarCargaESpeed();
-      updateDoc(doc(db, "agentes", String(agenteId)), {
-        "habilidades.lista": agenteAtual.habilidades.lista
-      }).catch(e => console.error("Erro ao salvar habilidade:", e));
-    } else if (currentModalType === "poder") {
-      if (!Array.isArray(agenteAtual.habilidades.lista)) agenteAtual.habilidades.lista = [];
-      agenteAtual.habilidades.lista.push({
-        id: item.id,
-        nome: item.nome,
-        tipo: "poder",
-        vertente: item.vertente,
-        custo: item.custo,
-        descricao: item.descricao,
-        afinidade: item.afinidade || "",
-        afinidadeAtiva: false
-      });
-      renderizarHabilidadesPoderes();
-      
-      const numPoderes = agenteAtual.habilidades.lista.filter(x => x.tipo === "poder").length;
-      const calculatedGC = 50 + numPoderes * 5;
-      agenteAtual.status.gc = calculatedGC;
-      const gcInput = document.getElementById("status-gc");
-      if (gcInput) gcInput.value = calculatedGC;
-
-      updateDoc(doc(db, "agentes", String(agenteId)), {
-        "habilidades.lista": agenteAtual.habilidades.lista,
-        "status.gc": calculatedGC
-      }).catch(e => console.error("Erro ao salvar poder e GC:", e));
-    } else if (currentModalType === "ritual") {
-      if (!Array.isArray(agenteAtual.habilidades.rituais)) agenteAtual.habilidades.rituais = [];
-      agenteAtual.habilidades.rituais.push({
-        id: item.id,
-        nome: item.nome,
-        circulo: item.circulo,
-        aspecto: item.aspecto,
-        custo: item.custo,
-        alc: item.alc,
-        target: item.target,
-        duracao: item.duracao,
-        resistencia: item.resistencia,
-        condicao: item.condicao || "-",
-        desc: item.desc
-      });
-      renderizarRituais();
-      salvarRituaisNuvem();
+    } catch (err) {
+      console.error("Erro ao adicionar item:", err);
+    } finally {
+      const modal = document.getElementById("regras-selecao-modal");
+      if (modal) modal.classList.add("hidden");
     }
-
-    document.getElementById("regras-selecao-modal").classList.add("hidden");
   }
 
   window.removerTrauma = (index) => {
@@ -2053,49 +2937,120 @@ if (formFicha) {
     }).catch(e => console.error("Erro ao salvar traumas:", e));
   };
 
+  // Handlers para Armas
+  window.removerArma = (index) => {
+    if (isReadOnly || !agenteAtual?.inventario?.armas) return;
+    agenteAtual.inventario.armas.splice(index, 1);
+    renderizarArmas();
+    calcularEAtualizarCargaESpeed();
+    salvarArmasNuvem();
+  };
+
+  window.editarArma = (index) => {
+    abrirEditorArma(index);
+  };
+
+  window.alterarQuantidadeArma = (index, value) => {
+    if (isReadOnly || !agenteAtual?.inventario?.armas?.[index]) return;
+    const val = Math.max(1, parseInt(value) || 1);
+    agenteAtual.inventario.armas[index].qtd = val;
+    calcularEAtualizarCargaESpeed();
+    salvarArmasNuvem();
+  };
+
+  window.alterarMunicaoArma = (index, value) => {
+    if (isReadOnly || !agenteAtual?.inventario?.armas?.[index]) return;
+    const arma = agenteAtual.inventario.armas[index];
+    const val = Math.max(0, Math.min(parseInt(value) || 0, arma.munMax || 0));
+    arma.mun = val;
+    renderizarArmas();
+    calcularEAtualizarCargaESpeed();
+    salvarArmasNuvem();
+  };
+
+  window.alterarPentesArma = (index, value) => {
+    if (isReadOnly || !agenteAtual?.inventario?.armas?.[index]) return;
+    const arma = agenteAtual.inventario.armas[index];
+    const val = Math.max(0, parseInt(value) || 0);
+    arma.pentes = val;
+    renderizarArmas();
+    calcularEAtualizarCargaESpeed();
+    salvarArmasNuvem();
+  };
+
+  window.adicionarModificacaoArma = (index, melNome) => {
+    if (isReadOnly || !agenteAtual?.inventario?.armas?.[index]) return;
+    const arma = agenteAtual.inventario.armas[index];
+    if (!Array.isArray(arma.melhorias)) arma.melhorias = [];
+    if (!arma.melhorias.includes(melNome)) {
+      arma.melhorias.push(melNome);
+      renderizarArmas();
+      calcularEAtualizarCargaESpeed();
+      salvarArmasNuvem();
+    }
+  };
+
+  window.removerModificacaoArma = (index, melNome) => {
+    if (isReadOnly || !agenteAtual?.inventario?.armas?.[index]) return;
+    const arma = agenteAtual.inventario.armas[index];
+    if (!Array.isArray(arma.melhorias)) return;
+    arma.melhorias = arma.melhorias.filter(m => m !== melNome);
+    renderizarArmas();
+    calcularEAtualizarCargaESpeed();
+    salvarArmasNuvem();
+  };
+
+  function salvarArmasNuvem() {
+    atualizarCalculosAutomaticos(true);
+    if (!agenteId) return;
+    try {
+      const payload = sanitizarParaFirestore({
+        "inventario.armas": agenteAtual.inventario.armas,
+        "inventario.equipamentos": agenteAtual.inventario.equipamentos
+      });
+      updateDoc(doc(db, "agentes", String(agenteId)), payload).catch(e =>
+        console.error("Erro ao salvar armas:", e)
+      );
+    } catch (e) {
+      console.error("Erro ao preparar armas para salvar:", e);
+    }
+  }
+
+  // Handlers para Equipamentos Gerais
   window.removerEquipamento = (index) => {
-    if (isReadOnly) return;
+    if (isReadOnly || !agenteAtual?.inventario?.equipamentos) return;
     agenteAtual.inventario.equipamentos.splice(index, 1);
     renderizarEquipamentos();
-    calcularEAtualizarCargaESpeed();
+    atualizarCalculosAutomaticos(true);
     salvarEquipamentosNuvem();
+  };
+
+  window.editarEquipamento = (index) => {
+    abrirEditorEquipamento(index);
   };
 
   window.alterarQuantidadeEquipamento = (index, value) => {
-    if (isReadOnly) return;
-    const val = parseInt(value) || 1;
+    if (isReadOnly || !agenteAtual?.inventario?.equipamentos?.[index]) return;
+    const val = Math.max(1, parseInt(value) || 1);
     agenteAtual.inventario.equipamentos[index].qtd = val;
-    calcularEAtualizarCargaESpeed();
-    salvarEquipamentosNuvem();
-  };
-
-  window.alterarMunicaoEquipamento = (index, value) => {
-    if (isReadOnly) return;
-    const val = parseInt(value) || 0;
-    agenteAtual.inventario.equipamentos[index].mun = val;
-    salvarEquipamentosNuvem();
-  };
-
-  window.toggleUpgrade = (index, melNome, isChecked) => {
-    if (isReadOnly) return;
-    const eq = agenteAtual.inventario.equipamentos[index];
-    if (!Array.isArray(eq.melhorias)) eq.melhorias = [];
-    
-    if (isChecked) {
-      if (!eq.melhorias.includes(melNome)) eq.melhorias.push(melNome);
-    } else {
-      eq.melhorias = eq.melhorias.filter(m => m !== melNome);
-    }
-    
-    renderizarEquipamentos();
-    calcularEAtualizarCargaESpeed();
+    atualizarCalculosAutomaticos(true);
     salvarEquipamentosNuvem();
   };
 
   function salvarEquipamentosNuvem() {
-    updateDoc(doc(db, "agentes", String(agenteId)), {
-      "inventario.equipamentos": agenteAtual.inventario.equipamentos
-    }).catch(e => console.error("Erro ao salvar equipamentos:", e));
+    atualizarCalculosAutomaticos(true);
+    if (!agenteId) return;
+    try {
+      const payload = sanitizarParaFirestore({
+        "inventario.armas": agenteAtual.inventario.armas,
+        "inventario.equipamentos": agenteAtual.inventario.equipamentos
+      });
+      updateDoc(doc(db, "agentes", String(agenteId)), payload).catch(e =>
+        console.error("Erro ao salvar equipamentos:", e)
+      );
+    } catch (e) {
+      console.error("Erro ao preparar equipamentos para salvar:", e);
+    }
   }
 
   window.removerBemMaterial = (index) => {
@@ -2103,6 +3058,10 @@ if (formFicha) {
     agenteAtual.recursos.bens_materiais.splice(index, 1);
     renderizarBensMateriais();
     salvarBensMateriaisNuvem();
+  };
+
+  window.editarBemMaterial = (index) => {
+    abrirEditorBemMaterial(index);
   };
 
   window.toggleMoradiaUpgrade = (index, melNome, isChecked) => {
@@ -2121,9 +3080,17 @@ if (formFicha) {
   };
 
   function salvarBensMateriaisNuvem() {
-    updateDoc(doc(db, "agentes", String(agenteId)), {
-      "recursos.bens_materiais": agenteAtual.recursos.bens_materiais
-    }).catch(e => console.error("Erro ao salvar bens materiais:", e));
+    if (!agenteId) return;
+    try {
+      const payload = sanitizarParaFirestore({
+        "recursos.bens_materiais": agenteAtual.recursos.bens_materiais
+      });
+      updateDoc(doc(db, "agentes", String(agenteId)), payload).catch(e =>
+        console.error("Erro ao salvar bens materiais:", e)
+      );
+    } catch (e) {
+      console.error("Erro ao preparar bens materiais para salvar:", e);
+    }
   }
 
   window.removerHabilidadePoder = (index) => {
@@ -2141,14 +3108,18 @@ if (formFicha) {
       const gcInput = document.getElementById("status-gc");
       if (gcInput) gcInput.value = calculatedGC;
       
-      updateDoc(doc(db, "agentes", String(agenteId)), {
-        "habilidades.lista": agenteAtual.habilidades.lista,
-        "status.gc": calculatedGC
-      }).catch(e => console.error("Erro ao salvar lista de habilidades e GC:", e));
+      if (agenteId) {
+        updateDoc(doc(db, "agentes", String(agenteId)), {
+          "habilidades.lista": agenteAtual.habilidades.lista,
+          "status.gc": calculatedGC
+        }).catch(e => console.error("Erro ao salvar lista de habilidades e GC:", e));
+      }
     } else {
-      updateDoc(doc(db, "agentes", String(agenteId)), {
-        "habilidades.lista": agenteAtual.habilidades.lista
-      }).catch(e => console.error("Erro ao salvar lista de habilidades:", e));
+      if (agenteId) {
+        updateDoc(doc(db, "agentes", String(agenteId)), {
+          "habilidades.lista": agenteAtual.habilidades.lista
+        }).catch(e => console.error("Erro ao salvar lista de habilidades:", e));
+      }
     }
   };
 
@@ -2156,9 +3127,11 @@ if (formFicha) {
     if (isReadOnly || !agenteAtual?.habilidades?.lista?.[index]) return;
     agenteAtual.habilidades.lista[index].afinidadeAtiva = !!ativa;
     renderizarHabilidadesPoderes();
-    updateDoc(doc(db, "agentes", String(agenteId)), {
-      "habilidades.lista": agenteAtual.habilidades.lista
-    }).catch(err => console.error("Erro ao salvar afinidade do poder:", err));
+    if (agenteId) {
+      updateDoc(doc(db, "agentes", String(agenteId)), {
+        "habilidades.lista": agenteAtual.habilidades.lista
+      }).catch(err => console.error("Erro ao salvar afinidade do poder:", err));
+    }
   };
 
   window.removerRitual = (index) => {
@@ -2169,6 +3142,7 @@ if (formFicha) {
   };
 
   function salvarRituaisNuvem() {
+    if (!agenteId) return;
     updateDoc(doc(db, "agentes", String(agenteId)), {
       "habilidades.rituais": agenteAtual.habilidades.rituais
     }).catch(e => console.error("Erro ao salvar rituais:", e));
@@ -2459,6 +3433,201 @@ if (formFicha) {
     modal.classList.remove("hidden");
   }
 
+  window.editarArma = (index) => {
+    abrirEditorArma(index);
+  };
+
+  function abrirEditorArma(index) {
+    if (isReadOnly || !agenteAtual) return;
+    const isNew = index === -1;
+    const item = !isNew && agenteAtual.inventario?.armas?.[index]
+      ? agenteAtual.inventario.armas[index]
+      : { nome: "", tipo: "Corpo a Corpo - Leve", dano: "1d6 + DB", danoTipo: "C", alc: "CC", atq: "1", munMax: 0, fa: "-", peso: 1.0, pentes: 1 };
+
+    editingItemState = { category: "arma", index, isNew };
+
+    const modal = document.getElementById("item-editor-modal");
+    const title = document.getElementById("item-editor-title");
+    const fields = document.getElementById("item-editor-fields");
+    if (!modal || !fields) return;
+
+    if (title) {
+      title.textContent = isNew ? "Adicionar Nova Arma" : "Editar Arma";
+    }
+
+    fields.innerHTML = `
+      <div class="item-editor-group">
+        <label for="editor-arma-nome">Nome da Arma:</label>
+        <input type="text" id="editor-arma-nome" value="${escapeHtml(item.nome || "")}" placeholder="Ex: Katana, Glock 17, Rifle de Precisão..." required />
+      </div>
+      <div class="item-editor-row">
+        <div class="item-editor-group">
+          <label for="editor-arma-tipo">Tipo / Categoria:</label>
+          <select id="editor-arma-tipo">
+            <option value="Corpo a Corpo - Leve" ${item.tipo === "Corpo a Corpo - Leve" ? "selected" : ""}>Corpo a Corpo - Leve</option>
+            <option value="Corpo a Corpo - Pesada" ${item.tipo === "Corpo a Corpo - Pesada" ? "selected" : ""}>Corpo a Corpo - Pesada</option>
+            <option value="Distância - Leve" ${item.tipo === "Distância - Leve" ? "selected" : ""}>Distância - Leve</option>
+            <option value="Distância - Pesada" ${item.tipo === "Distância - Pesada" ? "selected" : ""}>Distância - Pesada</option>
+            <option value="Arma Amaldiçoada (Véu)" ${item.tipo === "Arma Amaldiçoada (Véu)" ? "selected" : ""}>Arma Amaldiçoada (Véu)</option>
+          </select>
+        </div>
+        <div class="item-editor-group">
+          <label for="editor-arma-dano">Dano:</label>
+          <input type="text" id="editor-arma-dano" value="${escapeHtml(item.dano || "-")}" placeholder="Ex: 1d8 + DB, 2d6..." />
+        </div>
+      </div>
+      <div class="item-editor-row">
+        <div class="item-editor-group">
+          <label for="editor-arma-danotipo">Tipo de Dano:</label>
+          <input type="text" id="editor-arma-danotipo" value="${escapeHtml(item.danoTipo || "-")}" placeholder="Ex: C, P, I, B, Fogo..." />
+        </div>
+        <div class="item-editor-group">
+          <label for="editor-arma-alc">Alcance:</label>
+          <input type="text" id="editor-arma-alc" value="${escapeHtml(item.alc || "CC")}" placeholder="Ex: CC, Curto, Médio..." />
+        </div>
+      </div>
+      <div class="item-editor-row">
+        <div class="item-editor-group">
+          <label for="editor-arma-atq">Ataques por Turno:</label>
+          <input type="text" id="editor-arma-atq" value="${escapeHtml(String(item.atq || "1"))}" placeholder="Ex: 1, 2, 1/2, x" />
+        </div>
+        <div class="item-editor-group">
+          <label for="editor-arma-mun">Capacidade de Munição:</label>
+          <input type="number" id="editor-arma-mun" value="${item.munMax || 0}" min="0" />
+        </div>
+      </div>
+      <div class="item-editor-row">
+        <div class="item-editor-group">
+          <label for="editor-arma-pentes">Pentes Extras:</label>
+          <input type="number" id="editor-arma-pentes" value="${item.pentes !== undefined ? item.pentes : 1}" min="0" />
+        </div>
+        <div class="item-editor-group">
+          <label for="editor-arma-fa">Falha (Fa.):</label>
+          <input type="text" id="editor-arma-fa" value="${escapeHtml(String(item.fa || "-"))}" placeholder="Ex: 20, 19, -" />
+        </div>
+      </div>
+      <div class="item-editor-group">
+        <label for="editor-arma-peso">Peso (kg):</label>
+        <input type="number" step="0.1" id="editor-arma-peso" value="${item.peso || 0}" min="0" />
+      </div>
+    `;
+
+    modal.classList.remove("hidden");
+  }
+
+  function abrirEditorEquipamento(index) {
+    if (isReadOnly || !agenteAtual) return;
+    const isNew = index === -1;
+    const item = !isNew && agenteAtual.inventario?.equipamentos?.[index]
+      ? agenteAtual.inventario.equipamentos[index]
+      : { nome: "", categoria: "Equipamento Geral", peso: 0.5, desc: "" };
+
+    editingItemState = { category: "equipamento", index, isNew };
+
+    const modal = document.getElementById("item-editor-modal");
+    const title = document.getElementById("item-editor-title");
+    const fields = document.getElementById("item-editor-fields");
+    if (!modal || !fields) return;
+
+    if (title) {
+      title.textContent = isNew ? "Adicionar Novo Equipamento" : "Editar Equipamento";
+    }
+
+    fields.innerHTML = `
+      <div class="item-editor-group">
+        <label for="editor-eq-nome">Nome do Equipamento:</label>
+        <input type="text" id="editor-eq-nome" value="${escapeHtml(item.nome || "")}" placeholder="Ex: Lanterna tática, Colete Leve, Gazua..." required />
+      </div>
+      <div class="item-editor-row">
+        <div class="item-editor-group">
+          <label for="editor-eq-categoria">Categoria:</label>
+          <select id="editor-eq-categoria">
+            <option value="Equipamento Geral" ${item.categoria === "Equipamento Geral" ? "selected" : ""}>Equipamento Geral</option>
+            <option value="Explosivo" ${item.categoria === "Explosivo" ? "selected" : ""}>Explosivo</option>
+            <option value="Vestimenta" ${item.categoria === "Vestimenta" ? "selected" : ""}>Vestimenta e Proteção</option>
+            <option value="Equipamento do Véu" ${item.categoria === "Equipamento do Véu" ? "selected" : ""}>Equipamento do Véu</option>
+            <option value="Outro" ${item.categoria === "Outro" ? "selected" : ""}>Outro</option>
+          </select>
+        </div>
+        <div class="item-editor-group">
+          <label for="editor-eq-preco">Preço (€):</label>
+          <input type="number" step="1" id="editor-eq-preco" value="${item.preco != null ? item.preco : 0}" min="0" />
+        </div>
+        <div class="item-editor-group">
+          <label for="editor-eq-peso">Peso (kg):</label>
+          <input type="number" step="0.1" id="editor-eq-peso" value="${item.peso || 0}" min="0" />
+        </div>
+        <div class="item-editor-group">
+          <label for="editor-eq-rd">RD (Proteção):</label>
+          <input type="number" step="1" id="editor-eq-rd" value="${item.rd || 0}" min="0" />
+        </div>
+      </div>
+      <div class="item-editor-group">
+        <label for="editor-eq-desc">Descrição / Efeito:</label>
+        <textarea id="editor-eq-desc" rows="4" placeholder="Descrição ou efeito do equipamento...">${escapeHtml(item.desc || item.descricao || "")}</textarea>
+      </div>
+    `;
+
+    modal.classList.remove("hidden");
+  }
+
+  function abrirEditorBemMaterial(index, defaultTipo = "moradia") {
+    const isNew = index < 0;
+    const item = !isNew && agenteAtual?.recursos?.bens_materiais?.[index]
+      ? agenteAtual.recursos.bens_materiais[index]
+      : { nome: "", tipo: defaultTipo, preco: 0, velocidade: defaultTipo === "veiculo" ? "120 km/h" : "" };
+
+    editingItemState = { category: "bem_material", index, isNew };
+
+    const modal = document.getElementById("item-editor-modal");
+    const title = document.getElementById("item-editor-title");
+    const fields = document.getElementById("item-editor-fields");
+    if (!modal || !fields) return;
+
+    if (title) {
+      title.textContent = isNew
+        ? (item.tipo === "veiculo" ? "Adicionar Veículo Próprio" : "Adicionar Moradia Própria")
+        : (item.tipo === "veiculo" ? "Editar Veículo" : "Editar Moradia / Bem Material");
+    }
+
+    const currentTipo = item.tipo || defaultTipo || "moradia";
+
+    fields.innerHTML = `
+      <div class="item-editor-group">
+        <label for="editor-bem-nome">Nome do Bem Material:</label>
+        <input type="text" id="editor-bem-nome" value="${escapeHtml(item.nome || "")}" placeholder="Ex: Apartamento em Lisboa, Moto Esportiva..." required />
+      </div>
+      <div class="item-editor-row">
+        <div class="item-editor-group">
+          <label for="editor-bem-tipo">Tipo:</label>
+          <select id="editor-bem-tipo">
+            <option value="moradia" ${currentTipo === "moradia" ? "selected" : ""}>Moradia</option>
+            <option value="veiculo" ${currentTipo === "veiculo" ? "selected" : ""}>Veículo</option>
+            <option value="outro" ${currentTipo === "outro" ? "selected" : ""}>Outro</option>
+          </select>
+        </div>
+        <div class="item-editor-group">
+          <label for="editor-bem-preco">Preço (€):</label>
+          <input type="number" step="100" id="editor-bem-preco" value="${item.preco != null ? item.preco : 0}" min="0" />
+        </div>
+        <div class="item-editor-group" id="editor-bem-vel-group" style="${currentTipo === 'veiculo' ? '' : 'display: none;'}">
+          <label for="editor-bem-velocidade">Velocidade:</label>
+          <input type="text" id="editor-bem-velocidade" value="${escapeHtml(item.velocidade || '')}" placeholder="Ex: 140 km/h" />
+        </div>
+      </div>
+    `;
+
+    const tipoSelect = document.getElementById("editor-bem-tipo");
+    const velGroup = document.getElementById("editor-bem-vel-group");
+    if (tipoSelect && velGroup) {
+      tipoSelect.onchange = () => {
+        velGroup.style.display = tipoSelect.value === "veiculo" ? "block" : "none";
+      };
+    }
+
+    modal.classList.remove("hidden");
+  }
+
   const setupItemEditor = () => {
     const modal = document.getElementById("item-editor-modal");
     const closeBtn = document.getElementById("item-editor-close");
@@ -2617,6 +3786,112 @@ if (formFicha) {
 
           renderizarRituais();
           salvarRituaisNuvem();
+        } else if (category === "arma") {
+          const nome = document.getElementById("editor-arma-nome").value.trim();
+          if (!nome) return alert("Por favor, preencha o nome da arma.");
+          const tipo = document.getElementById("editor-arma-tipo").value;
+          const dano = document.getElementById("editor-arma-dano").value.trim() || "-";
+          const danoTipo = document.getElementById("editor-arma-danotipo").value.trim() || "-";
+          const alc = document.getElementById("editor-arma-alc").value.trim() || "CC";
+          const atq = document.getElementById("editor-arma-atq").value.trim() || "1";
+          const munMax = parseInt(document.getElementById("editor-arma-mun").value) || 0;
+          const fa = document.getElementById("editor-arma-fa").value.trim() || "-";
+          const peso = parseFloat(document.getElementById("editor-arma-peso").value) || 0;
+          const pentes = Math.max(0, parseInt(document.getElementById("editor-arma-pentes")?.value) || (munMax > 0 ? 1 : 0));
+
+          if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], armas: [], carga: 0, peso: "0 kg" };
+          if (!Array.isArray(agenteAtual.inventario.armas)) agenteAtual.inventario.armas = [];
+          const existing = !isNew ? agenteAtual.inventario.armas[index] : null;
+          const armaObj = {
+            id: isNew ? Date.now() : (existing?.id || Date.now()),
+            nome,
+            tipo,
+            categoria: tipo,
+            dano,
+            danoTipo,
+            alc,
+            atq,
+            mun: isNew ? munMax : (existing?.mun !== undefined ? existing.mun : munMax),
+            munMax,
+            pentes,
+            fa,
+            peso,
+            qtd: existing?.qtd || 1,
+            melhorias: existing?.melhorias || []
+          };
+
+          if (isNew) {
+            agenteAtual.inventario.armas.push(armaObj);
+          } else {
+            agenteAtual.inventario.armas[index] = armaObj;
+          }
+
+          renderizarArmas();
+          calcularEAtualizarCargaESpeed();
+          salvarArmasNuvem();
+        } else if (category === "equipamento") {
+          const nome = document.getElementById("editor-eq-nome").value.trim();
+          if (!nome) return alert("Por favor, preencha o nome do equipamento.");
+          const categoria = document.getElementById("editor-eq-categoria").value;
+          const preco = parseFloat(document.getElementById("editor-eq-preco")?.value) || 0;
+          const peso = parseFloat(document.getElementById("editor-eq-peso").value) || 0;
+          const rd = parseInt(document.getElementById("editor-eq-rd")?.value) || 0;
+          const desc = document.getElementById("editor-eq-desc").value.trim();
+
+          if (!agenteAtual.inventario) agenteAtual.inventario = { equipamentos: [], armas: [], carga: 0, peso: "0 kg" };
+          if (!Array.isArray(agenteAtual.inventario.equipamentos)) agenteAtual.inventario.equipamentos = [];
+          const existing = !isNew ? agenteAtual.inventario.equipamentos[index] : null;
+          const eqObj = {
+            id: isNew ? Date.now() : (existing?.id || Date.now()),
+            nome,
+            tipo: categoria,
+            categoria,
+            preco,
+            peso,
+            qtd: existing?.qtd || 1,
+            desc
+          };
+          if (rd > 0) eqObj.rd = rd;
+          if (existing?.dano) eqObj.dano = existing.dano;
+
+          if (isNew) {
+            agenteAtual.inventario.equipamentos.push(eqObj);
+          } else {
+            agenteAtual.inventario.equipamentos[index] = eqObj;
+          }
+
+          renderizarEquipamentos();
+          atualizarCalculosAutomaticos(true);
+          salvarEquipamentosNuvem();
+        } else if (category === "bem_material") {
+          const nome = document.getElementById("editor-bem-nome").value.trim();
+          if (!nome) return alert("Por favor, preencha o nome do bem material.");
+          const tipo = document.getElementById("editor-bem-tipo").value;
+          const preco = parseFloat(document.getElementById("editor-bem-preco")?.value) || 0;
+          const velocidade = tipo === "veiculo" ? (document.getElementById("editor-bem-velocidade")?.value.trim() || "N/A") : null;
+
+          if (!agenteAtual.recursos) agenteAtual.recursos = { bens_materiais: [] };
+          if (!Array.isArray(agenteAtual.recursos.bens_materiais)) agenteAtual.recursos.bens_materiais = [];
+          const existing = !isNew ? agenteAtual.recursos.bens_materiais[index] : null;
+          const bemObj = {
+            id: isNew ? Date.now() : (existing?.id || Date.now()),
+            nome,
+            tipo,
+            preco,
+            upgrades: existing?.upgrades || []
+          };
+          if (velocidade) bemObj.velocidade = velocidade;
+          else if (existing?.velocidade) bemObj.velocidade = existing.velocidade;
+          if (existing?.passageiros) bemObj.passageiros = existing.passageiros;
+
+          if (isNew) {
+            agenteAtual.recursos.bens_materiais.push(bemObj);
+          } else {
+            agenteAtual.recursos.bens_materiais[index] = bemObj;
+          }
+
+          renderizarBensMateriais();
+          salvarBensMateriaisNuvem();
         }
 
         fecharModalEditor();
@@ -2636,6 +3911,11 @@ if (formFicha) {
     
     const addRitual = document.getElementById("btn-add-ritual");
 
+    const addArma = document.getElementById("btn-add-arma");
+    const addEquipamento = document.getElementById("btn-add-equipamento");
+    const addMoradia = document.getElementById("btn-add-moradia");
+    const addVeiculo = document.getElementById("btn-add-veiculo");
+
     if (addFobia) addFobia.onclick = () => abrirModalSelecao("fobia");
     if (addMania) addMania.onclick = () => abrirModalSelecao("mania");
     if (addFerimento) addFerimento.onclick = () => abrirModalSelecao("ferimento");
@@ -2645,6 +3925,11 @@ if (formFicha) {
     if (addPoder) addPoder.onclick = () => abrirModalSelecao("poder");
     
     if (addRitual) addRitual.onclick = () => abrirModalSelecao("ritual");
+
+    if (addArma) addArma.onclick = () => abrirModalSelecao("arma");
+    if (addEquipamento) addEquipamento.onclick = () => abrirModalSelecao("equipamento");
+    if (addMoradia) addMoradia.onclick = () => abrirModalSelecao("moradia");
+    if (addVeiculo) addVeiculo.onclick = () => abrirModalSelecao("veiculo");
 
     // Lógica para fechar o modal de seleção de regras
     const modalSelecao = document.getElementById("regras-selecao-modal");
@@ -2669,7 +3954,112 @@ if (formFicha) {
     if (filterSelect) {
       filterSelect.onchange = () => filtrarItensModal();
     }
+
+    setupModalTextoAntigo();
   };
+
+  window.abrirModalTextoAntigo = (secao = "habilidades") => {
+    const modal = document.getElementById("modal-texto-antigo");
+    if (!modal) return;
+
+    const tabBtns = modal.querySelectorAll(".tab-btn-texto-antigo");
+    tabBtns.forEach(btn => {
+      btn.classList.toggle("active", btn.getAttribute("data-tab") === secao);
+    });
+
+    carregarTextoAntigoSecao(secao);
+    modal.classList.remove("hidden");
+  };
+
+  function carregarTextoAntigoSecao(secao) {
+    const textarea = document.getElementById("modal-texto-antigo-conteudo");
+    if (!textarea) return;
+
+    let texto = "";
+    if (secao === "habilidades") {
+      texto = agenteAtual?.habilidades?.texto_antigo || "";
+      if (!texto && Array.isArray(agenteAtual?.habilidades?.lista)) {
+        texto = agenteAtual.habilidades.lista.map(h => {
+          let bloco = (h.nome || "");
+          if (h.custo && h.custo !== "-") bloco += ` (${h.custo})`;
+          if (h.descricao) bloco += `\n${h.descricao}`;
+          return bloco;
+        }).join("\n\n----------------------------------\n\n");
+      }
+    } else if (secao === "equipamentos") {
+      texto = agenteAtual?.inventario?.texto_antigo || "";
+      if (!texto && (Array.isArray(agenteAtual?.inventario?.equipamentos) || Array.isArray(agenteAtual?.inventario?.armas))) {
+        const armas = (agenteAtual?.inventario?.armas || []).map(a => `${a.nome || "Arma"} (Dano: ${a.dano || "-"}, Peso: ${a.peso || 0}kg)`);
+        const eqs = (agenteAtual?.inventario?.equipamentos || []).map(e => `${e.nome || "Item"} (Peso: ${e.peso || 0}kg, Qtd: ${e.qtd || 1})`);
+        texto = [...armas, ...eqs].join("\n");
+      }
+    } else if (secao === "traumas") {
+      texto = agenteAtual?.perfil?.traumas_antigo || "";
+      if (!texto && Array.isArray(agenteAtual?.perfil?.traumas)) {
+        texto = agenteAtual.perfil.traumas.map(t => `${t.tipo ? `[${t.tipo.toUpperCase()}] ` : ""}${t.nome || ""}${t.efeito ? `: ${t.efeito}` : ""}`).join("\n");
+      }
+    } else if (secao === "rituais") {
+      texto = agenteAtual?.habilidades?.rituais_antigo || "";
+      if (!texto && Array.isArray(agenteAtual?.habilidades?.rituais)) {
+        texto = agenteAtual.habilidades.rituais.map(r => `${r.nome || ""} (${r.circulo || ""})\n${r.desc || ""}`).join("\n\n----------------------------------\n\n");
+      }
+    } else if (secao === "bens") {
+      texto = agenteAtual?.recursos?.bens_antigo || "";
+      if (!texto && Array.isArray(agenteAtual?.recursos?.bens_materiais)) {
+        texto = agenteAtual.recursos.bens_materiais.map(b => `${b.nome || "Bem"} (${b.tipo || "moradia"})`).join("\n");
+      }
+    }
+
+    textarea.value = texto.trim() || "Nenhuma anotação antiga encontrada para esta seção.";
+  }
+
+  const setupModalTextoAntigo = () => {
+    const modal = document.getElementById("modal-texto-antigo");
+    const closeBtn = document.getElementById("modal-texto-antigo-close");
+    const fecharBtn = document.getElementById("modal-texto-antigo-fechar");
+    const copiarBtn = document.getElementById("modal-texto-antigo-copiar");
+    const tabBtns = modal ? modal.querySelectorAll(".tab-btn-texto-antigo") : [];
+
+    const fechar = () => {
+      if (modal) modal.classList.add("hidden");
+    };
+
+    if (closeBtn) closeBtn.onclick = fechar;
+    if (fecharBtn) fecharBtn.onclick = fechar;
+    if (modal) {
+      modal.onclick = (e) => {
+        if (e.target === modal) fechar();
+      };
+    }
+
+    tabBtns.forEach(btn => {
+      btn.onclick = () => {
+        tabBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        carregarTextoAntigoSecao(btn.getAttribute("data-tab"));
+      };
+    });
+
+    if (copiarBtn) {
+      copiarBtn.onclick = () => {
+        const textarea = document.getElementById("modal-texto-antigo-conteudo");
+        if (!textarea || !textarea.value) return;
+        navigator.clipboard.writeText(textarea.value).then(() => {
+          const originalText = copiarBtn.textContent;
+          copiarBtn.textContent = "Copiado!";
+          setTimeout(() => {
+            copiarBtn.textContent = originalText;
+          }, 1500);
+        }).catch(() => {
+          textarea.select();
+          document.execCommand("copy");
+        });
+      };
+    }
+  };
+
+  setupInteractiveButtons();
+  renderizarTudoInterativo();
 
   // Lógica de Modo Escuro
   const btnDarkMode = document.getElementById("btn-dark-mode");
@@ -2703,7 +4093,8 @@ if (formFicha) {
       const updates = { ...pendingUpdates };
       pendingUpdates = {}; // limpa para o próximo lote
       try {
-        await updateDoc(doc(db, "agentes", String(agenteId)), updates);
+        const payload = sanitizarParaFirestore(updates);
+        await updateDoc(doc(db, "agentes", String(agenteId)), payload);
       } catch (e) {
         console.error("Erro ao atualizar campo:", e);
         alert(
@@ -2717,7 +4108,8 @@ if (formFicha) {
     const periciaInputs = formFicha.querySelectorAll(".linha-pericia input[type='number']:not(.input-base-fixa)");
     periciaInputs.forEach((input) => {
       const val = parseInt(input.value, 10) || 0;
-      const div5Span = input.nextElementSibling;
+      const row = input.closest(".linha-pericia");
+      const div5Span = row ? row.querySelector(".pericia-div5") : input.nextElementSibling;
       if (div5Span && div5Span.classList.contains("pericia-div5")) {
         div5Span.textContent = `(${Math.floor(val / 5)})`;
       }
@@ -2725,6 +4117,14 @@ if (formFicha) {
   }
 
   function carregarFichaNaTela() {
+    if (!agenteId) {
+      renderizarTudoInterativo();
+      setupInteractiveButtons();
+      atualizarIndicadoresPericiaDiv5();
+      atualizarCalculosAutomaticos(false);
+      return;
+    }
+
     const docRef = doc(db, "agentes", String(agenteId));
 
     // O "onSnapshot" mantém a ficha atualizada em tempo real se o mestre alterar algo!
@@ -2839,9 +4239,11 @@ if (formFicha) {
         if (marcaContainer) marcaContainer.onclick = null;
       }
       renderizarTudoInterativo();
+      atualizarCalculosAutomaticos(false);
     });
     setupInteractiveButtons();
     atualizarIndicadoresPericiaDiv5();
+    atualizarCalculosAutomaticos(false);
   }
 
   formFicha.addEventListener("input", (evento) => {
@@ -2872,6 +4274,36 @@ if (formFicha) {
       // Proteção: não atualizar os valores "base" dinamicamente, já que são inalteráveis
       if (chave.includes("_base")) return;
 
+      if (categoria === "status" && (chave === "pv_max" || chave === "pd_max")) {
+        const valNum = Number(elemento.value);
+        if (!agenteAtual.status) agenteAtual.status = {};
+        if (chave === "pv_max") {
+          const vig = parseInt(agenteAtual.atributos?.vigor) || 0;
+          const cor = parseInt(agenteAtual.atributos?.corpo) || 0;
+          const base = Math.floor((vig + cor) / 5);
+          const mod = valNum > 0 ? (valNum - base) : 0;
+          agenteAtual.status.pv_max = valNum > 0 ? valNum : base;
+          agenteAtual.status.pv_max_mod = mod;
+          const txt = mod !== 0 ? ` | Modificador permanente: ${mod > 0 ? "+" : ""}${mod}` : "";
+          elemento.title = `PV Máximo: ${agenteAtual.status.pv_max} (Base atributos: ${base}${txt}. Editável manualmente)`;
+          atualizarCampoDebounced("status", "pv_max", agenteAtual.status.pv_max);
+          atualizarCampoDebounced("status", "pv_max_mod", mod);
+          return;
+        } else {
+          const int = parseInt(agenteAtual.atributos?.inteligencia) || 0;
+          const sab = parseInt(agenteAtual.atributos?.sabedoria) || 0;
+          const base = Math.floor((int + sab) / 5);
+          const mod = valNum > 0 ? (valNum - base) : 0;
+          agenteAtual.status.pd_max = valNum > 0 ? valNum : base;
+          agenteAtual.status.pd_max_mod = mod;
+          const txt = mod !== 0 ? ` | Modificador permanente: ${mod > 0 ? "+" : ""}${mod}` : "";
+          elemento.title = `PD Máximo: ${agenteAtual.status.pd_max} (Base atributos: ${base}${txt}. Editável manualmente)`;
+          atualizarCampoDebounced("status", "pd_max", agenteAtual.status.pd_max);
+          atualizarCampoDebounced("status", "pd_max_mod", mod);
+          return;
+        }
+      }
+
       const valorTratado =
         elemento.type === "number"
           ? Number(elemento.value)
@@ -2881,6 +4313,12 @@ if (formFicha) {
 
       if (!agenteAtual[categoria]) agenteAtual[categoria] = {};
       agenteAtual[categoria][chave] = valorTratado;
+
+      if (categoria === "atributos") {
+        if (chave !== "humanidade" && chave !== "carisma") {
+          atualizarCalculosAutomaticos(true);
+        }
+      }
 
       // Envia APENAS o campo específico para a nuvem para não apagar edições de outros (ex: Mestre)
       atualizarCampoDebounced(categoria, chave, valorTratado);
@@ -2899,6 +4337,35 @@ if (formFicha) {
       const chave = partes[1];
       if (chave.includes("_base")) return;
 
+      if (categoria === "status" && (chave === "pv_max" || chave === "pd_max")) {
+        if (!agenteAtual.status) agenteAtual.status = {};
+        if (!elemento.value || Number(elemento.value) <= 0) {
+          if (chave === "pv_max") {
+            const vig = parseInt(agenteAtual.atributos?.vigor) || 0;
+            const cor = parseInt(agenteAtual.atributos?.corpo) || 0;
+            const base = Math.floor((vig + cor) / 5);
+            elemento.value = base > 0 ? base : "";
+            agenteAtual.status.pv_max = base;
+            agenteAtual.status.pv_max_mod = 0;
+            elemento.title = `PV Máximo: ${base} (Calculado pelos atributos: ${base})`;
+            atualizarCampoDebounced("status", "pv_max", base, true);
+            atualizarCampoDebounced("status", "pv_max_mod", 0, true);
+            return;
+          } else {
+            const int = parseInt(agenteAtual.atributos?.inteligencia) || 0;
+            const sab = parseInt(agenteAtual.atributos?.sabedoria) || 0;
+            const base = Math.floor((int + sab) / 5);
+            elemento.value = base > 0 ? base : "";
+            agenteAtual.status.pd_max = base;
+            agenteAtual.status.pd_max_mod = 0;
+            elemento.title = `PD Máximo: ${base} (Calculado pelos atributos: ${base})`;
+            atualizarCampoDebounced("status", "pd_max", base, true);
+            atualizarCampoDebounced("status", "pd_max_mod", 0, true);
+            return;
+          }
+        }
+      }
+
       const valorTratado =
         elemento.type === "number"
           ? Number(elemento.value)
@@ -2908,6 +4375,12 @@ if (formFicha) {
 
       if (!agenteAtual[categoria]) agenteAtual[categoria] = {};
       agenteAtual[categoria][chave] = valorTratado;
+
+      if (categoria === "atributos") {
+        if (chave !== "humanidade" && chave !== "carisma") {
+          atualizarCalculosAutomaticos(true);
+        }
+      }
 
       // Salva imediatamente com delay reduzido ao sair do campo
       atualizarCampoDebounced(categoria, chave, valorTratado, true);
