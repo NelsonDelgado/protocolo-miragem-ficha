@@ -25,7 +25,7 @@ import {
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-import { REGRAS } from "./regras.js?v=33";
+import { REGRAS } from "./regras.js?v=34";
 
 const firebaseConfig = {
   // Dados de autenticacao firebase
@@ -2221,7 +2221,8 @@ if (formFicha) {
       if (isMoradia) {
         detailsStr = `Tipo: <strong>Moradia</strong> | Custo: <strong>${(bem.preco || 0).toLocaleString('pt-PT')} €</strong>`;
       } else if (bem.tipo === "veiculo") {
-        detailsStr = `Tipo: <strong>Veículo</strong> | Velocidade: <strong>${bem.velocidade || "N/A"}</strong>${bem.passageiros ? ` | Passageiros: <strong>${bem.passageiros}</strong>` : ""} | Custo: <strong>${(bem.preco || 0).toLocaleString('pt-PT')} €</strong>`;
+        const catVeic = bem.categoria ? ` (${escapeHtml(bem.categoria)})` : "";
+        detailsStr = `Tipo: <strong>Veículo${catVeic}</strong> | Velocidade: <strong>${bem.velocidade || "N/A"}</strong>${bem.passageiros ? ` | Passageiros: <strong>${bem.passageiros}</strong>` : ""} | Custo: <strong>${(bem.preco || 0).toLocaleString('pt-PT')} €</strong>`;
       } else {
         detailsStr = `Tipo: <strong>${escapeHtml(bem.tipo || "Bem Material")}</strong> | Custo: <strong>${(bem.preco || 0).toLocaleString('pt-PT')} €</strong>`;
       }
@@ -2229,23 +2230,24 @@ if (formFicha) {
       let upgradesHtml = "";
       if (isMoradia && !isReadOnly) {
         const activeUpgrades = Array.isArray(bem.upgrades) ? bem.upgrades : [];
+        const totalMel = (REGRAS.melhoriasMoradia || []).length;
         const summaryText = activeUpgrades.length > 0
-          ? `⚙️ Melhorias (${activeUpgrades.length}/6): ${escapeHtml(activeUpgrades.join(", "))} ▾`
+          ? `⚙️ Melhorias (${activeUpgrades.length}/${totalMel}): ${escapeHtml(activeUpgrades.join(", "))} ▾`
           : `⚙️ Adicionar Melhorias (0 ativas) ▾`;
 
         upgradesHtml = `
           <details class="item-card-collapse" ${openIndexes.has(index) ? "open" : ""}>
             <summary>${summaryText}</summary>
-            <div class="item-card-collapse-content" style="margin-top: 4px;">
+            <div class="item-card-collapse-content" style="margin-top: 4px; max-height: 240px; overflow-y: auto; padding-right: 4px;">
               <div style="font-weight: bold; margin-bottom: 6px; font-size: 10.5px;">Melhorias da Moradia:</div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px;">
         `;
         (REGRAS.melhoriasMoradia || []).forEach(mel => {
           const checked = activeUpgrades.includes(mel.nome) ? "checked" : "";
           upgradesHtml += `
             <label style="display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; cursor: pointer;">
               <input type="checkbox" ${checked} onchange="window.toggleMoradiaUpgrade(${index}, '${escapeHtml(mel.nome)}', this.checked)" />
-              <span>${escapeHtml(mel.nome)} <small style="color: var(--muted, #888);">(${mel.preco}€)</small></span>
+              <span>${escapeHtml(mel.nome)} <small style="color: var(--muted, #888);">(${(mel.preco || 0).toLocaleString('pt-PT')}€)</small></span>
             </label>
           `;
         });
@@ -2492,7 +2494,23 @@ if (formFicha) {
       filterSelect.style.display = "none";
     } else if (tipo === "veiculo") {
       title.textContent = "Adicionar Veículo";
-      filterSelect.style.display = "none";
+      filterSelect.style.display = "block";
+      const catsVeiculos = [
+        { val: "", label: "Todos os Veículos" },
+        { val: "Aéreos", label: "Aéreos" },
+        { val: "Ágeis", label: "Ágeis" },
+        { val: "Aquáticos", label: "Aquáticos" },
+        { val: "Gerais", label: "Gerais" },
+        { val: "Leves", label: "Leves" },
+        { val: "Pesados", label: "Pesados" },
+        { val: "Rurais", label: "Rurais" }
+      ];
+      catsVeiculos.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c.val;
+        opt.textContent = c.label;
+        filterSelect.appendChild(opt);
+      });
     }
 
     const btnCustom = document.getElementById("modal-selecao-btn-custom");
@@ -2653,6 +2671,9 @@ if (formFicha) {
       items = REGRAS.moradias.map(m => ({ ...m, type: "moradia" }));
     } else if (currentModalType === "veiculo") {
       items = REGRAS.veiculos.map(v => ({ ...v, type: "veiculo" }));
+      if (filterVal) {
+        items = items.filter(v => v.tipo === filterVal);
+      }
     }
 
     const queryNorm = normalizarTexto(rawQuery);
@@ -2839,6 +2860,7 @@ if (formFicha) {
           id: item.id || Date.now(),
           nome: item.nome,
           tipo: "veiculo",
+          categoria: item.tipo || "Geral",
           preco: Number(item.preco) || 0,
           velocidade: item.velocidade || "N/A"
         };

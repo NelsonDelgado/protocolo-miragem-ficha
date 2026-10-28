@@ -2668,21 +2668,68 @@ export const REGRAS = {
   ],
 
   melhoriasMoradia: [
+    { id: "cadeira_plastico", nome: "Cadeira de Plástico", preco: 10 },
+    { id: "bong", nome: "Bong", preco: 50 },
+    { id: "toca_discos", nome: "Toca-discos", preco: 500 },
     { id: "sala_planejamento", nome: "Sala de Planejamento", preco: 600 },
+    { id: "balanca_industrial", nome: "Balança Industrial", preco: 1000 },
     { id: "gerador_independente", nome: "Gerador Independente", preco: 1000 },
+    { id: "plantacao", nome: "Plantação", preco: 1000 },
     { id: "sala_ocultismo", nome: "Sala de Ocultismo", preco: 1000 },
     { id: "garagem", nome: "Garagem", preco: 1000 },
+    { id: "sala_musica", nome: "Sala de Música", preco: 2000 },
+    { id: "desktop", nome: "Desktop", preco: 2500 },
+    { id: "observatorio", nome: "Observatório", preco: 2500 },
+    { id: "sala_emprego", nome: "Sala para Emprego", preco: 5000 },
+    { id: "centro_servidor", nome: "Centro de Servidor", preco: 10000 },
+    { id: "geladeira_industrial", nome: "Geladeira Industrial", preco: 10000 },
+    { id: "sauna_piscina", nome: "Sauna + Piscina", preco: 10000 },
+    { id: "cozinha_profissional", nome: "Cozinha Profissional", preco: 15000 },
+    { id: "cinema", nome: "Cinema", preco: 20000 },
+    { id: "sala_gravacoes", nome: "Sala de Gravações", preco: 25000 },
+    { id: "fornalha_industrial", nome: "Fornalha Industrial", preco: 50000 },
+    { id: "sala_radio", nome: "Sala de Rádio", preco: 50000 },
     { id: "oficina_reparos", nome: "Oficina de Reparos", preco: 60000 },
-    { id: "laboratorio_cientifico", nome: "Laboratório Científico", preco: 75000 }
+    { id: "laboratorio_cientifico", nome: "Laboratório Científico", preco: 75000 },
+    { id: "cofre", nome: "Cofre", preco: 100000 },
+    { id: "sala_fitness", nome: "Sala Fitness", preco: 150000 }
   ],
 
   veiculos: [
+    // Aéreos
     { id: "asa_delta", nome: "Asa-Delta", velocidade: "Média", passageiros: 2, preco: 1500, tipo: "Aéreos" },
+    { id: "avioneta", nome: "Avioneta", velocidade: "Extrema", passageiros: 2, preco: 120000, tipo: "Aéreos" },
+    { id: "helicoptero", nome: "Helicóptero", velocidade: "Rápida", passageiros: 6, preco: 50000, tipo: "Aéreos" },
+    { id: "jato_pessoal", nome: "Jato Pessoal", velocidade: "Absoluta", passageiros: 20, preco: 3000000, tipo: "Aéreos" },
+    // Ágeis
     { id: "moto_esportiva", nome: "Moto Esportiva", velocidade: "Extrema", passageiros: 2, preco: 10000, tipo: "Ágeis" },
+    { id: "moto_offroad", nome: "Moto offroad", velocidade: "Rápida", passageiros: 2, preco: 6000, tipo: "Ágeis" },
+    { id: "moto_simples", nome: "Moto Simples", velocidade: "Rápida", passageiros: 2, preco: 1000, tipo: "Ágeis" },
+    { id: "triciclo", nome: "Triciclo", velocidade: "Lenta", passageiros: 1, preco: 1200, tipo: "Ágeis" },
+    // Aquáticos
     { id: "barco_medio", nome: "Barco Médio", velocidade: "Média", passageiros: 8, preco: 30000, tipo: "Aquáticos" },
-    { id: "carro_economico", nome: "Carro Económico", velocidade: "Rápida", passageiros: 5, preco: 5000, tipo: "Leves" },
+    { id: "bote_caiaque", nome: "Bote / Caiaque", velocidade: "Lenta", passageiros: 5, preco: 650, tipo: "Aquáticos" },
+    { id: "iate", nome: "Iate", velocidade: "Média", passageiros: 200, preco: 200000, tipo: "Aquáticos" },
+    { id: "jangada", nome: "Jangada", velocidade: "Lenta", passageiros: 5, preco: 500, tipo: "Aquáticos" },
+    { id: "jetsky", nome: "Jetsky", velocidade: "Rápida", passageiros: 2, preco: 10000, tipo: "Aquáticos" },
+    // Gerais
+    { id: "bicicleta", nome: "Bicicleta", velocidade: "Lenta", passageiros: 2, preco: 200, tipo: "Gerais" },
+    { id: "patinete", nome: "Patinete", velocidade: "Lenta", passageiros: 2, preco: 150, tipo: "Gerais" },
+    { id: "patins", nome: "Patins", velocidade: "Lenta", passageiros: 1, preco: 80, tipo: "Gerais" },
+    { id: "skate", nome: "Skate", velocidade: "Lenta", passageiros: 1, preco: 100, tipo: "Gerais" },
+    // Leves
+    { id: "buggy", nome: "Buggy", velocidade: "Rápida", passageiros: 3, preco: 3000, tipo: "Leves" },
+    { id: "carro_economico", nome: "Carro Econômico", velocidade: "Rápida", passageiros: 5, preco: 5000, tipo: "Leves" },
+    { id: "carro_esportivo", nome: "Carro Esportivo", velocidade: "Extrema", passageiros: 2, preco: 45000, tipo: "Leves" },
     { id: "carro_offroad", nome: "Carro Offroad", velocidade: "Rápida", passageiros: 7, preco: 15000, tipo: "Leves" },
-    { id: "caminhao", nome: "Caminhão", velocidade: "Rápida", passageiros: "3+", preco: 40000, tipo: "Pesados" }
+    { id: "carro_vintage", nome: "Carro Vintage", velocidade: "Rápida", passageiros: 2, preco: 20000, tipo: "Leves" },
+    // Pesados
+    { id: "caminhao", nome: "Caminhão", velocidade: "Rápida", passageiros: "3+", preco: 40000, tipo: "Pesados" },
+    { id: "van", nome: "Van", velocidade: "Rápida", passageiros: 8, preco: 20000, tipo: "Pesados" },
+    // Rurais
+    { id: "carroca", nome: "Carroça", velocidade: "Lenta", passageiros: 7, preco: 1000, tipo: "Rurais" },
+    { id: "cavalo", nome: "Cavalo", velocidade: "Média", passageiros: 2, preco: 3000, tipo: "Rurais" },
+    { id: "ponei", nome: "Pônei", velocidade: "Lenta", passageiros: 1, preco: 1500, tipo: "Rurais" }
   ],
 
   fobias: [
