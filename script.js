@@ -119,7 +119,7 @@ function criarAgenteEmBranco(nomeInicial) {
       aumento_atributo_cura: "",
       total_niveis: "",
     },
-    status: { pv: 0, pv_max: 0, pd: 0, pd_max: 0, gc: 50, pv_max_mod: 0, pd_max_mod: 0 },
+    status: { pv: 0, pv_max: 0, pd: 0, pd_max: 0, gc: 0, pv_max_mod: 0, pd_max_mod: 0 },
     atributos: {
       forca: 0,
       inteligencia: 0,
@@ -1715,25 +1715,30 @@ if (formFicha) {
   function calcularEAtualizarCargaESpeed(salvarNuvem = false) {
     if (!agenteAtual) return;
     
-    // Capacidade de Carga: calculada a partir de Corpo (ou Força como alternativa caso Corpo não esteja definido)
-    const corpoVal = parseInt(agenteAtual.atributos?.corpo);
-    const forVal = parseInt(agenteAtual.atributos?.forca);
-    let valorBaseCarga = (!isNaN(corpoVal) && corpoVal > 0) ? corpoVal : ((!isNaN(forVal) && forVal > 0) ? forVal : 0);
+    // Capacidade de Carga: calculada a partir de Força (Regras Oficiais pág. 80)
+    const forVal = parseInt(agenteAtual.atributos?.forca) || 0;
+    let valorBaseCarga = forVal;
 
-    // Habilidade "Inventário Otimizado": usa Intelecto no lugar do atributo físico para calcular capacidade de carga
+    // Habilidade "Inventário Otimizado" (pág. 49): usa Intelecto no lugar da Força para calcular capacidade de carga
     const temInventarioOtimizado = Array.isArray(agenteAtual.habilidades?.lista) &&
-      agenteAtual.habilidades.lista.some(h => h.id === "inventario_otimizado" || (h.nome && h.nome.toLowerCase().includes("inventário otimizado")));
+      agenteAtual.habilidades.lista.some(h => {
+        const n = (h.id || h.nome || "").toLowerCase();
+        return n.includes("inventario_otimizado") || n.includes("inventário otimizado");
+      });
     if (temInventarioOtimizado) {
       valorBaseCarga = parseInt(agenteAtual.atributos?.inteligencia) || 0;
     }
 
-    // Habilidade "Mochileiro": aumenta o limite de carga em +5 kg
+    // Habilidade "Mochileiro" (pág. 46): seu limite de carga aumenta em 5 quilos
     const temMochileiro = Array.isArray(agenteAtual.habilidades?.lista) &&
-      agenteAtual.habilidades.lista.some(h => h.id === "mochileiro" || (h.nome && h.nome.toLowerCase().includes("mochileiro")));
+      agenteAtual.habilidades.lista.some(h => {
+        const n = (h.id || h.nome || "").toLowerCase();
+        return n.includes("mochileiro");
+      });
     const bonusCarga = temMochileiro ? 5 : 0;
 
-    const cargaLeve = (valorBaseCarga / 4) + bonusCarga;
-    const cargaMod = (valorBaseCarga / 2) + bonusCarga;
+    const cargaLeve = (valorBaseCarga / 4);
+    const cargaMod = (valorBaseCarga / 2);
     const cargaMax = valorBaseCarga + bonusCarga;
 
     const cargaLeveEl = document.getElementById("recursos-carga_leve");
@@ -1809,6 +1814,16 @@ if (formFicha) {
 
     if (badgeEl && penalidadeTextEl && deslocamentoTextEl) {
       let baseSpeed = 6.0;
+      // Habilidade "Atlético" (Regras Oficiais pág. 44): Recebe +3m em seu deslocamento
+      const temAtletico = Array.isArray(agenteAtual.habilidades?.lista) &&
+        agenteAtual.habilidades.lista.some(h => {
+          const n = (h.id || h.nome || "").toLowerCase();
+          return n.includes("atletico") || n.includes("atlético");
+        });
+      if (temAtletico) {
+        baseSpeed += 3.0;
+      }
+
       const modFerimentos = calcularModificadorDeslocamento(agenteAtual.perfil?.traumas);
       let speedCalculado = Math.max(0, baseSpeed + modFerimentos);
 
@@ -1935,18 +1950,50 @@ if (formFicha) {
     // 3. Dano Bônus (DB): Força + Corpo (Regra Oficial pág. 32)
     const forca = parseInt(agenteAtual.atributos?.forca) || 0;
     const somaForCor = forca + cor;
-    let dbCalculado = "0";
+    let baseIndex = 2; // Categoria base "0"
     if (somaForCor > 0) {
-      if (somaForCor <= 59) dbCalculado = "-2";
-      else if (somaForCor <= 79) dbCalculado = "-1";
-      else if (somaForCor <= 119) dbCalculado = "0";
-      else if (somaForCor <= 159) dbCalculado = "+1d4";
-      else if (somaForCor <= 209) dbCalculado = "+1d6";
-      else dbCalculado = "+2d6";
+      if (somaForCor <= 59) baseIndex = 0; // -2
+      else if (somaForCor <= 79) baseIndex = 1; // -1
+      else if (somaForCor <= 119) baseIndex = 2; // 0
+      else if (somaForCor <= 159) baseIndex = 3; // +1d4
+      else if (somaForCor <= 209) baseIndex = 4; // +1d6
+      else baseIndex = 5; // +2d6
     }
+
+    // Escala oficial de categorias de DB (Regras pág. 32 e 38)
+    const CATEGORIAS_DB = ["-2", "-1", "0", "+1d4", "+1d6", "+2d6", "+3d6", "+4d6", "+5d6"];
+
+    // Habilidade "Golpe Pesado" (Regras pág. 38): Seu DB aumenta em uma categoria
+    const countGolpePesado = Array.isArray(agenteAtual.habilidades?.lista)
+      ? agenteAtual.habilidades.lista.filter(h => {
+          const n = (h.id || h.nome || "").toLowerCase();
+          return n.includes("golpe_pesado") || n.includes("golpe pesado");
+        }).length
+      : 0;
+
+    const categoriaFinal = Math.min(CATEGORIAS_DB.length - 1, baseIndex + countGolpePesado);
+    const dbCalculado = CATEGORIAS_DB[categoriaFinal];
+
+    // Habilidade "Pugilista" (Regras pág. 46): Ataques desarmados causam 1d6 + DB (base é 1d3 + DB, pág. 32)
+    const temPugilista = Array.isArray(agenteAtual.habilidades?.lista) &&
+      agenteAtual.habilidades.lista.some(h => {
+        const n = (h.id || h.nome || "").toLowerCase();
+        return n.includes("pugilista");
+      });
+    const dadoDesarmadoBase = temPugilista ? "1d6" : "1d3";
+    const danoDesarmadoTotal = dbCalculado === "0"
+      ? dadoDesarmadoBase
+      : `${dadoDesarmadoBase} ${dbCalculado.startsWith("-") ? dbCalculado : "+" + dbCalculado}`;
+
     const dbEl = document.getElementById("combate-db");
     if (dbEl && dbEl.value !== dbCalculado) {
       dbEl.value = dbCalculado;
+    }
+    if (dbEl) {
+      let infoExtra = `Dano Bônus: ${dbCalculado} (Base Força+Corpo: ${somaForCor}`;
+      if (countGolpePesado > 0) infoExtra += ` | +${countGolpePesado} cat. por Golpe Pesado`;
+      infoExtra += `) | Ataque Desarmado: ${danoDesarmadoTotal}${temPugilista ? " (Pugilista)" : ""}`;
+      dbEl.title = infoExtra;
     }
     if (!agenteAtual.combate) agenteAtual.combate = { rd: 0, defesa: 0, db: "0" };
     agenteAtual.combate.db = dbCalculado;
@@ -1954,7 +2001,7 @@ if (formFicha) {
       atualizarCampoDebounced("combate", "db", dbCalculado);
     }
 
-    // 3. Defesa Passiva: Agilidade / 20 + Bônus de Equipamento (Regra Oficial pág. 32)
+    // 4. Defesa Passiva: Agilidade / 20 + Bônus de Equipamento (Regra Oficial pág. 32)
     const agi = parseInt(agenteAtual.atributos?.agilidade) || 0;
     const bonusAgi = Math.floor(agi / 20);
     let bonusEquip = 0;
@@ -1962,26 +2009,61 @@ if (formFicha) {
     eqs.forEach(eq => {
       if (eq.defesa) bonusEquip += parseInt(eq.defesa) || 0;
     });
-    const defesaCalculada = bonusAgi + bonusEquip;
+
+    // Poder "Precognição" (Regras pág. 63): +2 em Defesa e em testes de resistência
+    const temPrecognicao = Array.isArray(agenteAtual.habilidades?.lista) &&
+      agenteAtual.habilidades.lista.some(h => {
+        const n = (h.id || h.nome || "").toLowerCase();
+        return n.includes("precognicao") || n.includes("precognição");
+      });
+    const bonusPrecognicao = temPrecognicao ? 2 : 0;
+
+    const defesaCalculada = bonusAgi + bonusEquip + bonusPrecognicao;
     const defesaEl = document.getElementById("combate-defesa");
     if (defesaEl && String(defesaEl.value) !== String(defesaCalculada)) {
       defesaEl.value = defesaCalculada;
+    }
+    if (defesaEl) {
+      let infoDef = `Defesa Passiva: ${defesaCalculada} (Agilidade/20: ${bonusAgi}`;
+      if (bonusEquip > 0) infoDef += ` + Equipamentos: ${bonusEquip}`;
+      if (bonusPrecognicao > 0) infoDef += ` + Precognição: +2`;
+      infoDef += `)`;
+      defesaEl.title = infoDef;
     }
     agenteAtual.combate.defesa = defesaCalculada;
     if (deveSalvarNuvem) {
       atualizarCampoDebounced("combate", "defesa", defesaCalculada);
     }
 
-    // 4. Redução de Dano (RD): Soma de RD das vestimentas e proteções do inventário
+    // 5. Redução de Dano (RD): Soma de RD das vestimentas e proteções do inventário
     let rdCalculado = 0;
+    let temProtecaoPesada = false;
     eqs.forEach(eq => {
       if (eq.rd != null && eq.rd !== "") {
-        rdCalculado += Number(eq.rd) || 0;
+        const val = Number(eq.rd) || 0;
+        rdCalculado += val;
+        // Pág. 86: Uma vestimenta é considerada Proteção Pesada se der 4 ou + de RD
+        if (val >= 4) temProtecaoPesada = true;
       }
     });
+
+    // Habilidade "Tanque de Guerra" (pág. 46): se tiver Encouraçado e proteção pesada (RD >= 4), RD aumenta em +2
+    const temTanqueDeGuerra = Array.isArray(agenteAtual.habilidades?.lista) &&
+      agenteAtual.habilidades.lista.some(h => {
+        const n = (h.id || h.nome || "").toLowerCase();
+        return n.includes("tanque_de_guerra") || n.includes("tanque de guerra");
+      });
+    const bonusTanque = (temTanqueDeGuerra && temProtecaoPesada) ? 2 : 0;
+    rdCalculado += bonusTanque;
+
     const rdEl = document.getElementById("combate-rd");
     if (rdEl && String(rdEl.value) !== String(rdCalculado)) {
       rdEl.value = rdCalculado;
+    }
+    if (rdEl) {
+      let infoRd = `Redução de Dano: ${rdCalculado}`;
+      if (bonusTanque > 0) infoRd += ` (inclui +2 por Tanque de Guerra em Proteção Pesada)`;
+      rdEl.title = infoRd;
     }
     agenteAtual.combate.rd = rdCalculado;
     if (deveSalvarNuvem) {
@@ -2887,7 +2969,7 @@ if (formFicha) {
           requisito: item.requisito || "-"
         });
         renderizarHabilidadesPoderes();
-        calcularEAtualizarCargaESpeed();
+        atualizarCalculosAutomaticos(true);
         if (agenteId) {
           updateDoc(doc(db, "agentes", String(agenteId)), sanitizarParaFirestore({
             "habilidades.lista": agenteAtual.habilidades.lista
@@ -2896,7 +2978,6 @@ if (formFicha) {
       } else if (currentModalType === "poder") {
         if (!agenteAtual.habilidades) agenteAtual.habilidades = { lista: [], rituais: [] };
         if (!Array.isArray(agenteAtual.habilidades.lista)) agenteAtual.habilidades.lista = [];
-        agenteAtual.habilidades.push ? null : null;
         agenteAtual.habilidades.lista.push({
           id: item.id || Date.now(),
           nome: item.nome,
@@ -2909,17 +2990,19 @@ if (formFicha) {
         });
         renderizarHabilidadesPoderes();
         
-        const numPoderes = agenteAtual.habilidades.lista.filter(x => x.tipo === "poder").length;
-        const calculatedGC = 50 + numPoderes * 5;
-        if (!agenteAtual.status) agenteAtual.status = { gc: 50 };
-        agenteAtual.status.gc = calculatedGC;
+        const gcAtual = parseInt(agenteAtual.status?.gc) || 0;
+        const novoGC = Math.min(50, gcAtual + 5);
+        if (!agenteAtual.status) agenteAtual.status = { gc: 0 };
+        agenteAtual.status.gc = novoGC;
         const gcInput = document.getElementById("status-gc");
-        if (gcInput) gcInput.value = calculatedGC;
+        if (gcInput) gcInput.value = novoGC;
+
+        atualizarCalculosAutomaticos(true);
 
         if (agenteId) {
           updateDoc(doc(db, "agentes", String(agenteId)), sanitizarParaFirestore({
             "habilidades.lista": agenteAtual.habilidades.lista,
-            "status.gc": calculatedGC
+            "status.gc": novoGC
           })).catch(e => console.error("Erro ao salvar poder e GC:", e));
         }
       } else if (currentModalType === "ritual") {
@@ -3121,22 +3204,24 @@ if (formFicha) {
     agenteAtual.habilidades.lista.splice(index, 1);
     
     renderizarHabilidadesPoderes();
-    calcularEAtualizarCargaESpeed();
 
     if (item.tipo === "poder") {
-      const numPoderes = agenteAtual.habilidades.lista.filter(x => x.tipo === "poder").length;
-      const calculatedGC = 50 + numPoderes * 5;
-      agenteAtual.status.gc = calculatedGC;
+      const gcAtual = parseInt(agenteAtual.status?.gc) || 0;
+      const novoGC = Math.max(0, gcAtual - 5);
+      agenteAtual.status.gc = novoGC;
       const gcInput = document.getElementById("status-gc");
-      if (gcInput) gcInput.value = calculatedGC;
+      if (gcInput) gcInput.value = novoGC;
       
+      atualizarCalculosAutomaticos(true);
+
       if (agenteId) {
         updateDoc(doc(db, "agentes", String(agenteId)), {
           "habilidades.lista": agenteAtual.habilidades.lista,
-          "status.gc": calculatedGC
+          "status.gc": novoGC
         }).catch(e => console.error("Erro ao salvar lista de habilidades e GC:", e));
       }
     } else {
+      atualizarCalculosAutomaticos(true);
       if (agenteId) {
         updateDoc(doc(db, "agentes", String(agenteId)), {
           "habilidades.lista": agenteAtual.habilidades.lista
@@ -3149,6 +3234,7 @@ if (formFicha) {
     if (isReadOnly || !agenteAtual?.habilidades?.lista?.[index]) return;
     agenteAtual.habilidades.lista[index].afinidadeAtiva = !!ativa;
     renderizarHabilidadesPoderes();
+    atualizarCalculosAutomaticos(true);
     if (agenteId) {
       updateDoc(doc(db, "agentes", String(agenteId)), {
         "habilidades.lista": agenteAtual.habilidades.lista
@@ -3758,18 +3844,28 @@ if (formFicha) {
           }
 
           renderizarHabilidadesPoderes();
-          calcularEAtualizarCargaESpeed();
 
-          const numPoderes = agenteAtual.habilidades.lista.filter(x => x.tipo === "poder").length;
-          const calculatedGC = 50 + numPoderes * 5;
-          agenteAtual.status.gc = calculatedGC;
-          const gcInput = document.getElementById("status-gc");
-          if (gcInput) gcInput.value = calculatedGC;
+          if (tipo === "poder" && isNew) {
+            const gcAtual = parseInt(agenteAtual.status?.gc) || 0;
+            const novoGC = Math.min(50, gcAtual + 5);
+            if (!agenteAtual.status) agenteAtual.status = { gc: 0 };
+            agenteAtual.status.gc = novoGC;
+            const gcInput = document.getElementById("status-gc");
+            if (gcInput) gcInput.value = novoGC;
 
-          updateDoc(doc(db, "agentes", String(agenteId)), {
-            "habilidades.lista": agenteAtual.habilidades.lista,
-            "status.gc": calculatedGC
-          }).catch(err => console.error("Erro ao salvar habilidades e GC:", err));
+            atualizarCalculosAutomaticos(true);
+
+            updateDoc(doc(db, "agentes", String(agenteId)), {
+              "habilidades.lista": agenteAtual.habilidades.lista,
+              "status.gc": novoGC
+            }).catch(err => console.error("Erro ao salvar habilidades e GC:", err));
+          } else {
+            atualizarCalculosAutomaticos(true);
+
+            updateDoc(doc(db, "agentes", String(agenteId)), {
+              "habilidades.lista": agenteAtual.habilidades.lista
+            }).catch(err => console.error("Erro ao salvar habilidades:", err));
+          }
 
         } else if (category === "ritual") {
           const nome = document.getElementById("editor-rit-nome").value.trim();
