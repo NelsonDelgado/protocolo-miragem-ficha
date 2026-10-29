@@ -3037,9 +3037,11 @@ if (formFicha) {
     agenteAtual.perfil.traumas.splice(index, 1);
     renderizarTraumas();
     calcularEAtualizarCargaESpeed();
-    updateDoc(doc(db, "agentes", String(agenteId)), {
-      "perfil.traumas": agenteAtual.perfil.traumas
-    }).catch(e => console.error("Erro ao salvar traumas:", e));
+    if (agenteId) {
+      updateDoc(doc(db, "agentes", String(agenteId)), {
+        "perfil.traumas": agenteAtual.perfil.traumas
+      }).catch(e => console.error("Erro ao salvar traumas:", e));
+    }
   };
 
   // Handlers para Armas
@@ -3780,9 +3782,11 @@ if (formFicha) {
 
           renderizarTraumas();
           calcularEAtualizarCargaESpeed();
-          updateDoc(doc(db, "agentes", String(agenteId)), {
-            "perfil.traumas": agenteAtual.perfil.traumas
-          }).catch(err => console.error("Erro ao salvar trauma:", err));
+          if (agenteId) {
+            updateDoc(doc(db, "agentes", String(agenteId)), {
+              "perfil.traumas": agenteAtual.perfil.traumas
+            }).catch(err => console.error("Erro ao salvar trauma:", err));
+          }
 
         } else if (category === "habilidade_poder") {
           const tipo = document.getElementById("editor-hab-tipo").value;
@@ -4204,10 +4208,12 @@ if (formFicha) {
     });
   }
   function atualizarCampoDebounced(categoria, chave, valor, imediato = false) {
+    if (!agenteId) return;
     pendingUpdates[`${categoria}.${chave}`] = valor;
     clearTimeout(saveTimeoutFicha);
     const delay = imediato ? 100 : 500;
     saveTimeoutFicha = setTimeout(async () => {
+      if (!agenteId) return;
       const updates = { ...pendingUpdates };
       pendingUpdates = {}; // limpa para o próximo lote
       try {
